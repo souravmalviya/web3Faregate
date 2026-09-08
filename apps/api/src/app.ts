@@ -29,6 +29,7 @@ import { paymentMiddlewareFromHTTPServer } from '@x402/express';
 import type { AIProvider } from './ai/provider.ts';
 import { describeModes, type AppConfig } from './config.ts';
 import type { DataProvider } from './data/provider.ts';
+import type { IdentityService } from './identity/service.ts';
 import { createHttpResourceServer } from './payment/x402.ts';
 import { parsePrompt, parseStructuredQuery, isAddress } from './query-parser.ts';
 import { createDataRouter } from './routes/data.ts';
@@ -39,6 +40,7 @@ export interface AppDeps {
   store: GatewayStore;
   dataProvider: DataProvider;
   aiProvider: AIProvider;
+  identity: IdentityService;
   /** Injected so tests can pin time. */
   now?: () => Date;
 }
@@ -97,7 +99,7 @@ const policySchema = z.object({
 });
 
 export function createApp(deps: AppDeps): Express {
-  const { config, store, aiProvider } = deps;
+  const { config, store, aiProvider, identity } = deps;
   const now = deps.now ?? (() => new Date());
 
   const app = express();
@@ -123,6 +125,7 @@ export function createApp(deps: AppDeps): Express {
       providers: {
         data: deps.dataProvider.describe(),
         ai: aiProvider.describe(),
+        identity: identity.describe(),
       },
     });
   });
@@ -187,6 +190,15 @@ export function createApp(deps: AppDeps): Express {
    */
   app.post('/agents/:id/revoke', (req: Request, res: Response) => {
     const id = String(req.params.id);
+    if (!identity.canRevokeLocally(id)) {
+      // An ENS passport is revoked by its owner, onchain, with their own
+      // wallet. The gateway only reads the chain; it never writes to it.
+      throw new HttpError(
+        409,
+        'revoke_onchain',
+        `${id} is an ENS passport. Revoke it by setting the text record faregate.status to "revoked" on the name, or by unregistering the subname. The gateway will refuse the agent at its next request.`,
+      );
+    }
     const agent = store.revokeAgent(id);
     if (!agent) throw new HttpError(404, 'agent_not_found', `No passport for ${id}.`);
     store.recordEvent({ type: 'agent.revoked', actor: 'human', agentId: id }, now());
@@ -243,8 +255,8 @@ export function createApp(deps: AppDeps): Express {
       }
     }
 
-    const agent = store.getAgent(agentId);
-    const policy = agent ? store.getPolicy(agentId) : null;
+    const resolved = await identity.resolve(agentId, at);
+    const { agent, policy } = resolved;
 
     const decision = evaluatePolicy({
       agent,
@@ -287,7 +299,13 @@ export function createApp(deps: AppDeps): Express {
         actor: 'agent',
         agentId,
         requestId: request.id,
-        detail: { prompt: request.prompt, parseNote: parseResult.note, interpretedBy },
+        detail: {
+          prompt: request.prompt,
+          parseNote: parseResult.note,
+          interpretedBy,
+          identitySource: resolved.source,
+          ...(resolved.note ? { identityNote: resolved.note } : {}),
+        },
       },
       at,
     );
@@ -411,10 +429,12 @@ export function createApp(deps: AppDeps): Express {
   // to verify against, so the middleware is not mounted and the router issues a
   // receipt stamped `simulated`.
   if (config.payment.mode === 'live') {
-    const httpResourceServer = createHttpResourceServer({ config, store, now });
+    const httpResourceServer = createHttpResourceServer({ config, store, identity, now });
     app.use(paymentMiddlewareFromHTTPServer(httpResourceServer));
   }
-  app.use(createDataRouter({ config, store, dataProvider: deps.dataProvider, aiProvider, now }));
+  app.use(
+    createDataRouter({ config, store, dataProvider: deps.dataProvider, aiProvider, identity, now }),
+  );
 
   // --- audit -------------------------------------------------------------
 

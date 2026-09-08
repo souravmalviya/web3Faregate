@@ -20,6 +20,7 @@ import { microsToUsd, type PaymentReceipt, type RequestResult } from '@faregate/
 import type { AIProvider } from '../ai/provider.ts';
 import type { AppConfig } from '../config.ts';
 import { DataProviderError, type DataProvider } from '../data/provider.ts';
+import type { IdentityService } from '../identity/service.ts';
 import { reevaluate, type PaymentGateDeps } from '../payment/x402.ts';
 import type { GatewayStore } from '../store.ts';
 
@@ -28,6 +29,7 @@ export interface DataRouteDeps {
   store: GatewayStore;
   dataProvider: DataProvider;
   aiProvider: AIProvider;
+  identity: IdentityService;
   now?: () => Date;
 }
 
@@ -51,9 +53,9 @@ function decodeSettlement(raw: unknown): Record<string, unknown> | null {
 }
 
 export function createDataRouter(deps: DataRouteDeps): Router {
-  const { config, store, dataProvider, aiProvider } = deps;
+  const { config, store, dataProvider, aiProvider, identity } = deps;
   const now = deps.now ?? (() => new Date());
-  const gateDeps: PaymentGateDeps = { config, store, now };
+  const gateDeps: PaymentGateDeps = { config, store, identity, now };
 
   const router = express.Router();
 
@@ -70,7 +72,7 @@ export function createDataRouter(deps: DataRouteDeps): Router {
     // Defence in depth. In live mode the middleware already ran this check
     // before quoting a price; running it again costs nothing and closes the
     // gap if the middleware is ever mounted incorrectly.
-    const check = reevaluate(gateDeps, requestId);
+    const check = await reevaluate(gateDeps, requestId);
     if (!check.ok) {
       store.recordEvent(
         {

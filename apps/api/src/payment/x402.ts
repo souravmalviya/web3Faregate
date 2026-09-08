@@ -25,6 +25,7 @@ import { ExactHederaScheme } from '@x402/hedera/exact/server';
 import { evaluatePolicy, priceQueryMicros, type PolicyDecision } from '@faregate/shared';
 
 import type { AppConfig } from '../config.ts';
+import type { IdentityService } from '../identity/service.ts';
 import type { GatewayStore } from '../store.ts';
 
 /** The single protected route pattern. */
@@ -39,6 +40,7 @@ export function requestIdFromPath(path: string): string | null {
 export interface PaymentGateDeps {
   config: AppConfig;
   store: GatewayStore;
+  identity: IdentityService;
   now?: () => Date;
 }
 
@@ -49,10 +51,12 @@ export interface PaymentGateDeps {
  * passport can be revoked, a policy tightened or a budget consumed between the
  * quote and the payment, and the gate has to see the world as it is now.
  */
-export function reevaluate(
+export async function reevaluate(
   deps: PaymentGateDeps,
   requestId: string,
-): { ok: true; decision: PolicyDecision; costMicros: number } | { ok: false; reason: string } {
+): Promise<
+  { ok: true; decision: PolicyDecision; costMicros: number } | { ok: false; reason: string }
+> {
   const { store } = deps;
   const now = deps.now ?? (() => new Date());
   const at = now();
@@ -70,19 +74,22 @@ export function reevaluate(
     return { ok: false, reason: 'This request is still waiting on human approval.' };
   }
 
-  const agent = store.getAgent(request.agentId);
-  const policy = agent ? store.getPolicy(request.agentId) : null;
+  // Live resolution every time. The identity service fails closed when ENS is
+  // the source of truth and cannot be reached, which is the behaviour we want
+  // in front of a payment.
+  const identity = await deps.identity.resolve(request.agentId, at);
 
   const decision = evaluatePolicy({
-    agent,
-    policy,
+    agent: identity.agent,
+    policy: identity.policy,
     query: request.query,
     spentTodayMicros: store.spentTodayMicros(request.agentId, at),
     now: at,
   });
 
   if (!decision.allowed) {
-    return { ok: false, reason: decision.reasons[0]?.message ?? 'Policy denied the request.' };
+    const why = decision.reasons[0]?.message ?? 'Policy denied the request.';
+    return { ok: false, reason: identity.note ? `${why} (${identity.note})` : why };
   }
   if (decision.requiresHumanApproval && request.approval?.decision !== 'approved') {
     return { ok: false, reason: 'Human approval is required and has not been given.' };
@@ -126,12 +133,12 @@ export function createRoutes(deps: PaymentGateDeps): RoutesConfig {
         network: config.payment.network as `${string}:${string}`,
         payTo: config.payment.payTo ?? '0.0.0',
         maxTimeoutSeconds: config.payment.maxTimeoutSeconds,
-        price: (context: HTTPRequestContext): Price => {
+        price: async (context: HTTPRequestContext): Promise<Price> => {
           const requestId = requestIdFromPath(context.path);
           if (!requestId) {
             throw new Error('Protected route was reached without a request id.');
           }
-          const check = reevaluate(deps, requestId);
+          const check = await reevaluate(deps, requestId);
           if (!check.ok) {
             // Should be unreachable: onProtectedRequest aborts first. Throwing
             // here is the backstop that prevents quoting an unauthorised request.
@@ -169,7 +176,7 @@ export function createHttpResourceServer(deps: PaymentGateDeps): x402HTTPResourc
         return { abort: true as const, reason: 'Malformed data request path.' };
       }
 
-      const check = reevaluate(deps, requestId);
+      const check = await reevaluate(deps, requestId);
       if (!check.ok) {
         const request = deps.store.getRequest(requestId);
         deps.store.recordEvent({

@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+/*
+ * Faregate dashboard tokens.
+ *
+ * The same identity as the build plan and the agent CLI: transit signage
+ * (Barlow Condensed for headings, Barlow for body, IBM Plex Mono for money and
+ * identifiers) on a blue-biased neutral ground with a brass accent standing in
+ * for a fare token. Semantic colours for request state are separate from the
+ * accent so a status never competes with a control.
+ */
+:root {
+  --ground: #f2f3f6;
+  --surface: #ffffff;
+  --surface-2: #e9ebf0;
+  --ink: #131820;
+  --ink-2: #39424f;
+  --muted: #5e6877;
+  --rule: #d9dde4;
+  --rule-strong: #b6bdc8;
+
+  --brass: #8a6113;
+  --brass-fill: #f4ebd6;
+
+  --pass: #17734a;
+  --pass-fill: #e0f0e7;
+  --hold: #8a5a00;
+  --hold-fill: #f6ebd2;
+  --stop: #9e3427;
+  --stop-fill: #f7e5e2;
+  --info: #2a63bc;
+  --info-fill: #e2ebf9;
+
+  --font-display: var(--font-barlow-condensed), 'Arial Narrow', sans-serif;
+  --font-body: var(--font-barlow), 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ground: #0d1117;
+    --surface: #151b24;
+    --surface-2: #1c232e;
+    --ink: #e7ebf1;
+    --ink-2: #c0c8d4;
+    --muted: #8e9aaa;
+    --rule: #242d39;
+    --rule-strong: #37424f;
+
+    --brass: #d9a94e;
+    --brass-fill: #2a2113;
+
+    --pass: #57c18c;
+    --pass-fill: #14261d;
+    --hold: #e0b24f;
+    --hold-fill: #2a2113;
+    --stop: #e58072;
+    --stop-fill: #2b1917;
+    --info: #7bacee;
+    --info-fill: #16233a;
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-brass: var(--brass);
+  --color-brass-fill: var(--brass-fill);
+  --color-pass: var(--pass);
+  --color-pass-fill: var(--pass-fill);
+  --color-hold: var(--hold);
+  --color-hold-fill: var(--hold-fill);
+  --color-stop: var(--stop);
+  --color-stop-fill: var(--stop-fill);
+  --color-info: var(--info);
+  --color-info-fill: var(--info-fill);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+html {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Digits line up in every table and money column. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section eyebrow: mono, tracked, quiet. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Display headings. */
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

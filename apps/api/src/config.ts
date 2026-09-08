@@ -9,7 +9,14 @@
  * screen is real.
  */
 
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+// Load .env from the repository root rather than the process cwd, so the
+// gateway behaves the same whether it is started from the root, from apps/api,
+// or by a launcher with an unrelated working directory.
+loadDotenv({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env') });
 
 export type SubsystemMode = 'live' | 'simulated';
 
@@ -80,6 +87,8 @@ export interface EnsConfig {
   rpcUrl: string | undefined;
   /** Parent name that agent passports live under. */
   parentName: string;
+  /** Override for the ENSv2 Universal Resolver address. */
+  universalResolver: string | undefined;
   reason?: string;
 }
 
@@ -142,15 +151,17 @@ function loadAi(): AiConfig {
 function loadEns(): EnsConfig {
   const rpcUrl = str('ENS_RPC_URL');
   const parentName = str('FAREGATE_PARENT_NAME') ?? 'agents.faregate.eth';
+  const universalResolver = str('ENS_UNIVERSAL_RESOLVER');
   if (!rpcUrl) {
     return {
       mode: 'simulated',
       rpcUrl,
       parentName,
+      universalResolver,
       reason: 'ENS_RPC_URL is not set, so passports resolve from the local store.',
     };
   }
-  return { mode: 'live', rpcUrl, parentName };
+  return { mode: 'live', rpcUrl, parentName, universalResolver };
 }
 
 export function loadConfig(): AppConfig {

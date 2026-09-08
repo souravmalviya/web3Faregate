@@ -33,6 +33,16 @@ export const HEDERA_TESTNET = 'hedera:testnet';
 /** Asset id x402 uses for native HBAR. */
 export const HBAR_ASSET = '0.0.0';
 
+/**
+ * USDC on Hedera testnet, six decimals.
+ *
+ * This is the default fare asset because six decimals makes it exactly 1:1 with
+ * the micro-USD unit the gateway prices in, so a price becomes an atomic amount
+ * with no conversion and no exchange rate. Charging in native HBAR would need a
+ * price oracle, and a hardcoded rate would put an invented number on screen.
+ */
+export const USDC_TESTNET_ASSET = '0.0.429274';
+
 export interface PaymentConfig {
   mode: SubsystemMode;
   /** CAIP-2 network the gateway prices and settles in. */
@@ -88,7 +98,7 @@ function loadPayment(): PaymentConfig {
     network: str('FAREGATE_NETWORK') ?? HEDERA_TESTNET,
     facilitatorUrl: str('X402_FACILITATOR_URL') ?? 'https://x402.org/facilitator',
     payTo,
-    asset: str('FAREGATE_ASSET') ?? HBAR_ASSET,
+    asset: str('FAREGATE_ASSET') ?? USDC_TESTNET_ASSET,
     maxTimeoutSeconds: int('FAREGATE_PAYMENT_TIMEOUT_SECONDS', 120),
   };
   if (!payTo) {

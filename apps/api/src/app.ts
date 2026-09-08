@@ -23,13 +23,19 @@ import {
   type RequestStatus,
 } from '@faregate/shared';
 
+import { paymentMiddlewareFromHTTPServer } from '@x402/express';
+
 import { describeModes, type AppConfig } from './config.ts';
+import type { DataProvider } from './data/provider.ts';
+import { createHttpResourceServer } from './payment/x402.ts';
 import { parsePrompt, parseStructuredQuery, isAddress } from './query-parser.ts';
+import { createDataRouter } from './routes/data.ts';
 import { GatewayStore } from './store.ts';
 
 export interface AppDeps {
   config: AppConfig;
   store: GatewayStore;
+  dataProvider: DataProvider;
   /** Injected so tests can pin time. */
   now?: () => Date;
 }
@@ -343,6 +349,19 @@ export function createApp(deps: AppDeps): Express {
 
     res.json({ request: updated });
   });
+
+  // --- paid data route ---------------------------------------------------
+
+  // In live mode the x402 middleware sits in front of the data router: it
+  // returns 402 with payment requirements, verifies the payment the agent sends
+  // back, and only then lets the router run. In simulated mode there is nothing
+  // to verify against, so the middleware is not mounted and the router issues a
+  // receipt stamped `simulated`.
+  if (config.payment.mode === 'live') {
+    const httpResourceServer = createHttpResourceServer({ config, store, now });
+    app.use(paymentMiddlewareFromHTTPServer(httpResourceServer));
+  }
+  app.use(createDataRouter({ config, store, dataProvider: deps.dataProvider, now }));
 
   // --- audit -------------------------------------------------------------
 

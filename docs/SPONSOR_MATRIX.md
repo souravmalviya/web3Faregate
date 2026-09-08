@@ -126,11 +126,20 @@ once against the Messari standardized lending schema. The same
 protocol that publishes the standard, which is what lets an agent ask about
 "lending positions" without the gateway knowing which protocol it is.
 
-**Implementation status.** `TARGET`. The query documents are standardized;
-multi-protocol fan-out (one query, several subgraph ids) is the remaining work
-to make the leverage visible in the demo.
+**Implementation status.** `IMPLEMENTED` and `TESTED`. `GraphDataProvider`
+takes any number of `protocol=subgraph` targets (`GRAPH_SUBGRAPHS`), runs the
+same standardized document against all of them, and returns the answer keyed
+by protocol with per-protocol errors reported rather than hidden. An agent
+that names a protocol gets that one only. Ten tests in
+`apps/api/src/data/provider.test.ts` cover fan-out, single-protocol routing,
+partial failure, total failure, and Bearer-header auth.
 
-**Confidence.** Medium.
+**What the standard made easier.** Zero per-protocol code. Adding a protocol
+is one entry in an environment variable, and every existing query works
+against it on the next request.
+
+**Confidence.** High on the mechanism. Live breadth depends on the operator
+pinning subgraphs that publish the Messari standard schema.
 
 **Official documentation.** https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/ ,
 https://thegraph.com/docs/en/subgraphs/querying/managing-api-keys/

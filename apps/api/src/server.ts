@@ -3,7 +3,12 @@
 import { AnthropicAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import { createApp } from './app.ts';
 import { describeModes, loadConfig } from './config.ts';
-import { GraphDataProvider, SimulatedDataProvider, type DataProvider } from './data/provider.ts';
+import {
+  GraphDataProvider,
+  SimulatedDataProvider,
+  parseGraphTargets,
+  type DataProvider,
+} from './data/provider.ts';
 import { EnsPassportResolver } from './identity/ens.ts';
 import { EnsIdentityService, LocalIdentityService, type IdentityService } from './identity/service.ts';
 import { GatewayStore, seedDemoData } from './store.ts';
@@ -17,8 +22,7 @@ seedDemoData(store);
 const dataProvider: DataProvider =
   config.data.mode === 'live'
     ? new GraphDataProvider({
-        subgraphUrl: config.data.subgraphUrl,
-        subgraphId: process.env.GRAPH_SUBGRAPH_ID,
+        targets: parseGraphTargets(config.data.subgraphs),
         apiKey: config.data.graphApiKey,
       })
     : new SimulatedDataProvider();

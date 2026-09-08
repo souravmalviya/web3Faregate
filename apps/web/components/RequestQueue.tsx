@@ -113,6 +113,11 @@ function Row({
         </td>
         <td className="px-3 py-2.5">
           <Pill tone={tone}>{STATUS_LABEL[request.status]}</Pill>
+          {request.lastRefusal ? (
+            <div className="mt-1 max-w-[220px] text-[11.5px] leading-snug text-stop">
+              Refused at the gate: {request.lastRefusal.reason}
+            </div>
+          ) : null}
         </td>
         <td className="px-3 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           {waiting ? (

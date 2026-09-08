@@ -70,8 +70,11 @@ export interface DataConfig {
   mode: SubsystemMode;
   /** Gateway API key from Subgraph Studio. */
   graphApiKey: string | undefined;
-  /** Full subgraph query URL, if the operator pinned one. */
-  subgraphUrl: string | undefined;
+  /**
+   * `protocol=idOrUrl,protocol=idOrUrl`. Every protocol listed here publishes
+   * the Messari standard schema, so one document queries all of them.
+   */
+  subgraphs: string | undefined;
   reason?: string;
 }
 
@@ -122,16 +125,28 @@ function loadPayment(): PaymentConfig {
 
 function loadData(): DataConfig {
   const graphApiKey = str('GRAPH_API_KEY');
-  const subgraphUrl = str('GRAPH_SUBGRAPH_URL');
-  if (!graphApiKey && !subgraphUrl) {
+  // Accept the multi-protocol form, or a single id/url as a one-entry list.
+  const subgraphs =
+    str('GRAPH_SUBGRAPHS')
+    ?? (str('GRAPH_SUBGRAPH_URL') ? `default=${str('GRAPH_SUBGRAPH_URL')}` : undefined)
+    ?? (str('GRAPH_SUBGRAPH_ID') ? `default=${str('GRAPH_SUBGRAPH_ID')}` : undefined);
+  if (!subgraphs) {
     return {
       mode: 'simulated',
       graphApiKey,
-      subgraphUrl,
-      reason: 'Neither GRAPH_API_KEY nor GRAPH_SUBGRAPH_URL is set.',
+      subgraphs,
+      reason: 'GRAPH_SUBGRAPHS is not set, so no subgraph can be queried.',
     };
   }
-  return { mode: 'live', graphApiKey, subgraphUrl };
+  if (!graphApiKey) {
+    return {
+      mode: 'simulated',
+      graphApiKey,
+      subgraphs,
+      reason: 'GRAPH_API_KEY is not set, so the Graph gateway would refuse the query.',
+    };
+  }
+  return { mode: 'live', graphApiKey, subgraphs };
 }
 
 function loadAi(): AiConfig {

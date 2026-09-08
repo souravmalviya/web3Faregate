@@ -74,6 +74,11 @@ export function createDataRouter(deps: DataRouteDeps): Router {
     // gap if the middleware is ever mounted incorrectly.
     const check = await reevaluate(gateDeps, requestId);
     if (!check.ok) {
+      store.updateRequest(
+        requestId,
+        { lastRefusal: { at: at.toISOString(), stage: 'data-release', reason: check.reason } },
+        at,
+      );
       store.recordEvent(
         {
           type: 'payment.rejected',

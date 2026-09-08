@@ -179,6 +179,14 @@ export function createHttpResourceServer(deps: PaymentGateDeps): x402HTTPResourc
       const check = await reevaluate(deps, requestId);
       if (!check.ok) {
         const request = deps.store.getRequest(requestId);
+        const refusedAt = (deps.now ?? (() => new Date()))();
+        if (request) {
+          deps.store.updateRequest(
+            requestId,
+            { lastRefusal: { at: refusedAt.toISOString(), stage: 'pre-payment', reason: check.reason } },
+            refusedAt,
+          );
+        }
         deps.store.recordEvent({
           type: 'payment.rejected',
           actor: 'system',

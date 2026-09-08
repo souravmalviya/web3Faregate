@@ -1,0 +1,7 @@
+{
+  "name": "@faregate/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Operator scripts. Run directly with Node; nothing here is imported by the apps."
+}

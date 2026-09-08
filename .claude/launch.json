@@ -2,15 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "api",
+      "name": "faregate-api",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["apps/api/src/server.ts"],
+      "runtimeArgs": [
+        "apps/api/src/server.ts"
+      ],
       "port": 8402
     },
     {
-      "name": "web",
+      "name": "faregate-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--workspace", "@faregate/web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--workspace",
+        "@faregate/web"
+      ],
       "port": 3000
     }
   ]

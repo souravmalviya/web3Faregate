@@ -36,7 +36,7 @@ function simulatedConfig(): AppConfig {
       maxTimeoutSeconds: 60,
       reason: 'test',
     },
-    data: { mode: 'simulated', graphApiKey: undefined, subgraphUrl: undefined, reason: 'test' },
+    data: { mode: 'simulated', graphApiKey: undefined, subgraphs: undefined, reason: 'test' },
     ai: { mode: 'simulated', apiKey: undefined, model: 'claude-opus-5', reason: 'test' },
     ens: {
       mode: 'simulated',

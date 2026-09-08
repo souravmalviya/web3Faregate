@@ -18,6 +18,8 @@
     "lint": "npm run lint --workspaces --if-present",
     "dev:api": "npm run dev --workspace @faregate/api",
     "dev:web": "npm run dev --workspace @faregate/web",
-    "agent": "npm run start --workspace @faregate/agent"
+    "agent": "npm run start --workspace @faregate/agent",
+    "check": "npm run typecheck && npm test && npm run build",
+    "ens:passport": "node scripts/ens/passport.ts"
   }
 }

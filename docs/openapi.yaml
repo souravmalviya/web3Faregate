@@ -1,0 +1,475 @@
+openapi: 3.1.0
+info:
+  title: Faregate gateway
+  version: 0.1.0
+  summary: A permission and payment gateway for AI agents that need onchain data.
+  description: |
+    Agents buy onchain data by the query. Humans decide what they are allowed to buy.
+
+    The flow an agent follows:
+
+    1. `POST /requests` with a natural-language ask or a structured query. The
+       gateway resolves the agent's passport, evaluates a deterministic policy
+       and returns a decision and a price. No data is returned here.
+    2. If the decision requires a human, wait until `GET /requests/{id}`
+       reports `payment_required`.
+    3. `GET /data/{id}`. In live mode this answers `402 Payment Required` with
+       x402 payment requirements (network `hedera:testnet`, asset USDC). Retry
+       with a `PAYMENT-SIGNATURE` header and the data is released with a
+       verified receipt. In simulated mode the receipt is stamped `simulated`.
+
+    Every response that carries data or a receipt also carries its provenance.
+    Nothing simulated is presented as a chain fact.
+servers:
+  - url: http://localhost:8402
+tags:
+  - name: agent
+    description: Calls an agent makes.
+  - name: human
+    description: Calls the dashboard makes on behalf of the human owner.
+  - name: system
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Gateway readiness and which subsystems are live or simulated.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+
+  /agents:
+    get:
+      tags: [human]
+      summary: List passports the gateway knows about, with policy and spend.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentWithPolicy'
+
+  /agents/{id}:
+    get:
+      tags: [human]
+      summary: One passport.
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200':
+          description: OK
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /agents/{id}/policy:
+    put:
+      tags: [human]
+      summary: Replace the capability attached to a local passport.
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyInput'
+      responses:
+        '200':
+          description: OK
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /agents/{id}/revoke:
+    post:
+      tags: [human]
+      summary: Revoke a local passport. The kill switch.
+      description: |
+        Irreversible through this API. An ENS passport cannot be revoked here;
+        the response is `409 revoke_onchain` with instructions to set the
+        `faregate.status` text record to `revoked` or unregister the subname.
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+      responses:
+        '200':
+          description: Revoked.
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+
+  /requests:
+    post:
+      tags: [agent]
+      summary: Submit a data request and receive a decision and a price.
+      description: Never returns data. Returns `201` when allowed and `403` when refused.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRequest'
+      responses:
+        '201':
+          description: Allowed. Status is `payment_required` or `awaiting_approval`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestEnvelope'
+        '200':
+          description: Replayed. The idempotency key matched an earlier request.
+        '403':
+          description: Refused by policy. The request body explains why.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestEnvelope'
+        '400':
+          $ref: '#/components/responses/Error'
+    get:
+      tags: [human]
+      summary: List recent requests, newest first.
+      responses:
+        '200':
+          description: OK
+
+  /requests/{id}:
+    get:
+      tags: [agent, human]
+      summary: One request, including decision, approval, receipt and result.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request:
+                    $ref: '#/components/schemas/AccessRequest'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /requests/{id}/explain:
+    get:
+      tags: [human]
+      summary: A plain-language explanation of the decision.
+      description: Narrates a decision already made. Never an input to it.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId: { type: string }
+                  explanation: { type: string }
+                  provider: { type: string, enum: [anthropic, rule-based] }
+
+  /requests/{id}/approval:
+    post:
+      tags: [human]
+      summary: Approve or reject a request that is waiting on a human.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, by]
+              properties:
+                decision: { type: string, enum: [approved, rejected] }
+                by: { $ref: '#/components/schemas/Address' }
+                note: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: OK
+        '409':
+          description: The request is not awaiting approval.
+
+  /data/{id}:
+    get:
+      tags: [agent]
+      summary: Collect the data for an authorised request, paying the fare.
+      description: |
+        The only route that returns data. Policy is re-evaluated before a price
+        is quoted and again before release. In live mode the first call answers
+        `402` with x402 requirements; the retry carries `PAYMENT-SIGNATURE`.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Data released.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataResponse'
+        '402':
+          description: Payment required. Body and `PAYMENT-REQUIRED` header carry x402 requirements.
+        '403':
+          description: Refused at the gate. Not authorised, revoked, over budget, or already fulfilled.
+        '502':
+          description: Payment was taken but the data provider failed. The request is marked failed.
+
+  /events:
+    get:
+      tags: [human]
+      summary: The append-only audit trail, newest first.
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+      responses:
+        '200':
+          description: OK
+
+components:
+  parameters:
+    AgentId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string }
+      description: ENS passport name, for example `research.agents.faregate.eth`.
+    RequestId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Error:
+      description: Structured error.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+
+  schemas:
+    Address:
+      type: string
+      pattern: '^0x[a-fA-F0-9]{40}$'
+
+    ResourceKind:
+      type: string
+      enum: [wallet.balances, wallet.transfers, wallet.activity, protocol.positions, protocol.markets]
+
+    ResourceQuery:
+      type: object
+      required: [resource, address, lookbackDays]
+      properties:
+        resource: { $ref: '#/components/schemas/ResourceKind' }
+        address: { $ref: '#/components/schemas/Address' }
+        lookbackDays: { type: integer, minimum: 1, maximum: 365 }
+        protocol: { type: string, pattern: '^[a-z0-9-]{1,40}$' }
+
+    CreateRequest:
+      type: object
+      required: [agentId]
+      properties:
+        agentId: { type: string }
+        prompt:
+          type: string
+          maxLength: 2000
+          description: Natural-language ask. Interpreted, then validated.
+        query:
+          $ref: '#/components/schemas/ResourceQuery'
+        idempotencyKey: { type: string, minLength: 8, maxLength: 128 }
+
+    PolicyInput:
+      type: object
+      required: [allowedResources, maxCostPerQueryUsd, dailyLimitUsd, humanApprovalAboveUsd]
+      properties:
+        allowedResources:
+          type: array
+          items: { $ref: '#/components/schemas/ResourceKind' }
+        maxCostPerQueryUsd: { type: number, minimum: 0 }
+        dailyLimitUsd: { type: number, minimum: 0 }
+        humanApprovalAboveUsd: { type: number, minimum: 0 }
+        expiresAt: { type: [string, 'null'], format: date-time }
+
+    Policy:
+      allOf:
+        - $ref: '#/components/schemas/PolicyInput'
+        - type: object
+          properties:
+            agentId: { type: string }
+
+    Agent:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        owner: { $ref: '#/components/schemas/Address' }
+        status: { type: string, enum: [active, revoked, expired] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        source: { type: string, enum: [ens, local] }
+
+    AgentWithPolicy:
+      allOf:
+        - $ref: '#/components/schemas/Agent'
+        - type: object
+          properties:
+            policy: { $ref: '#/components/schemas/Policy' }
+            spentTodayUsd: { type: number }
+
+    PolicyDecision:
+      type: object
+      properties:
+        allowed: { type: boolean }
+        requiresHumanApproval: { type: boolean }
+        estimatedCostUsd: { type: number }
+        spentTodayUsd: { type: number }
+        remainingTodayUsd: { type: number }
+        evaluatedAt: { type: string, format: date-time }
+        reasons:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                enum:
+                  - agent_unknown
+                  - agent_revoked
+                  - agent_expired
+                  - policy_expired
+                  - resource_not_allowed
+                  - invalid_query
+                  - exceeds_per_query_limit
+                  - exceeds_daily_limit
+                  - requires_human_approval
+                  - within_limits
+              message: { type: string }
+              detail: { type: object, additionalProperties: true }
+
+    PaymentReceipt:
+      type: object
+      properties:
+        requestId: { type: string }
+        txHash: { type: string }
+        network: { type: string, example: 'hedera:testnet' }
+        from: { type: string }
+        to: { type: string }
+        amount: { type: string, description: Atomic units of the asset. }
+        asset: { type: string, example: '0.0.429274' }
+        settled: { type: boolean }
+        verifiedAt: { type: string, format: date-time }
+        verifiedBy: { type: string, enum: [facilitator, rpc, simulated] }
+
+    DataProvenance:
+      type: object
+      properties:
+        provider: { type: string, enum: [the-graph, simulated] }
+        source: { type: string }
+        queriedAt: { type: string, format: date-time }
+        simulated: { type: boolean }
+
+    RequestResult:
+      type: object
+      properties:
+        data: {}
+        provenance: { $ref: '#/components/schemas/DataProvenance' }
+        analysis: { type: string, description: Grounding-checked model summary. }
+        analysisError: { type: string }
+        fulfilledAt: { type: string, format: date-time }
+
+    AccessRequest:
+      type: object
+      properties:
+        id: { type: string }
+        agentId: { type: string }
+        prompt: { type: string }
+        query: { $ref: '#/components/schemas/ResourceQuery' }
+        status:
+          type: string
+          enum: [pending, awaiting_approval, approved, rejected, payment_required, paid, fulfilled, failed]
+        estimatedCostUsd: { type: number }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        decision: { $ref: '#/components/schemas/PolicyDecision' }
+        approval:
+          type: object
+          properties:
+            decision: { type: string, enum: [approved, rejected] }
+            by: { $ref: '#/components/schemas/Address' }
+            at: { type: string, format: date-time }
+            note: { type: string }
+        payment: { $ref: '#/components/schemas/PaymentReceipt' }
+        result: { $ref: '#/components/schemas/RequestResult' }
+        error: { type: string }
+        lastRefusal:
+          type: object
+          properties:
+            at: { type: string, format: date-time }
+            stage: { type: string, enum: [pre-payment, data-release] }
+            reason: { type: string }
+
+    RequestEnvelope:
+      type: object
+      properties:
+        request: { $ref: '#/components/schemas/AccessRequest' }
+        parseNote: { type: string }
+        interpretedBy: { type: string, enum: [anthropic, rule-based, structured] }
+
+    DataResponse:
+      type: object
+      properties:
+        requestId: { type: string }
+        query: { $ref: '#/components/schemas/ResourceQuery' }
+        result: { $ref: '#/components/schemas/RequestResult' }
+        payment: { $ref: '#/components/schemas/PaymentReceipt' }
+        budget:
+          type: object
+          properties:
+            chargedUsd: { type: number }
+            spentTodayUsd: { type: number }
+
+    Health:
+      type: object
+      properties:
+        ok: { type: boolean }
+        service: { type: string }
+        time: { type: string, format: date-time }
+        network: { type: string }
+        modes:
+          type: object
+          properties:
+            payment: { type: string, enum: [live, simulated] }
+            data: { type: string, enum: [live, simulated] }
+            ai: { type: string, enum: [live, simulated] }
+            ens: { type: string, enum: [live, simulated] }
+        notes:
+          type: array
+          items: { type: string }
+        providers:
+          type: object
+          properties:
+            data: { type: string }
+            ai: { type: string }
+            identity: { type: string }

@@ -118,6 +118,13 @@ export interface AccessRequest {
   result?: RequestResult;
   /** Set when the request ends in `failed`. */
   error?: string;
+  /**
+   * The most recent time the gate turned this request away. A request can be
+   * approved and still be refused at collection, for example after the
+   * passport was revoked; this records that so it can be shown next to the
+   * request rather than only in the audit log.
+   */
+  lastRefusal?: { at: string; stage: 'pre-payment' | 'data-release'; reason: string };
 }
 
 /**

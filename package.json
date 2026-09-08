@@ -1,0 +1,23 @@
+{
+  "name": "faregate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A permission and payment gateway for AI agents that need access to onchain data.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:api": "npm run dev --workspace @faregate/api",
+    "dev:web": "npm run dev --workspace @faregate/web",
+    "agent": "npm run start --workspace @faregate/agent"
+  }
+}

@@ -1,0 +1,47 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+keystore/
+secrets/
+
+# local data
+data/
+*.sqlite
+*.db
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# editor and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# test output
+coverage/
+.nyc_output/
+
+# hardhat
+cache/
+artifacts/
+typechain-types/

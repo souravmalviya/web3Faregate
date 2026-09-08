@@ -83,7 +83,8 @@ async function boot(): Promise<Harness> {
         ...init,
         headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
       });
-      return { status: response.status, body: await response.json().catch(() => ({})) };
+      const body = (await response.json().catch(() => ({}))) as any;
+      return { status: response.status, body };
     },
   };
 }

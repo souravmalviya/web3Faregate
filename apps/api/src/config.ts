@@ -127,7 +127,7 @@ function loadData(): DataConfig {
 
 function loadAi(): AiConfig {
   const apiKey = str('ANTHROPIC_API_KEY');
-  const model = str('FAREGATE_AI_MODEL') ?? 'claude-sonnet-5';
+  const model = str('FAREGATE_AI_MODEL') ?? 'claude-opus-5';
   if (!apiKey) {
     return {
       mode: 'simulated',

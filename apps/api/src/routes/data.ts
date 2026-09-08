@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 
 import { microsToUsd, type PaymentReceipt, type RequestResult } from '@faregate/shared';
 
+import type { AIProvider } from '../ai/provider.ts';
 import type { AppConfig } from '../config.ts';
 import { DataProviderError, type DataProvider } from '../data/provider.ts';
 import { reevaluate, type PaymentGateDeps } from '../payment/x402.ts';
@@ -26,6 +27,7 @@ export interface DataRouteDeps {
   config: AppConfig;
   store: GatewayStore;
   dataProvider: DataProvider;
+  aiProvider: AIProvider;
   now?: () => Date;
 }
 
@@ -49,13 +51,19 @@ function decodeSettlement(raw: unknown): Record<string, unknown> | null {
 }
 
 export function createDataRouter(deps: DataRouteDeps): Router {
-  const { config, store, dataProvider } = deps;
+  const { config, store, dataProvider, aiProvider } = deps;
   const now = deps.now ?? (() => new Date());
   const gateDeps: PaymentGateDeps = { config, store, now };
 
   const router = express.Router();
 
-  router.get('/data/:requestId', async (req: Request, res: Response) => {
+  // Express 4 does not route a rejected promise to the error handler, so the
+  // async body lives in `handle` and its rejection is forwarded explicitly.
+  router.get('/data/:requestId', (req: Request, res: Response, next) => {
+    handle(req, res).catch(next);
+  });
+
+  async function handle(req: Request, res: Response): Promise<void> {
     const requestId = String(req.params.requestId);
     const at = now();
 
@@ -188,6 +196,32 @@ export function createDataRouter(deps: DataRouteDeps): Router {
       });
     }
 
+    // Analysis runs after the data is in hand and never blocks delivery. A
+    // model failure leaves the data intact and records why the summary is
+    // missing; a grounding failure strips the unverified value and logs it.
+    try {
+      const analysis = await aiProvider.analyze(request.query, result.data, result.provenance);
+      result = { ...result, analysis: analysis.text };
+      store.recordEvent(
+        {
+          type: 'analysis.completed',
+          actor: 'system',
+          agentId: request.agentId,
+          requestId,
+          detail: {
+            provider: analysis.provider,
+            groundingWarnings: analysis.groundingWarnings,
+          },
+        },
+        at,
+      );
+    } catch (error) {
+      result = {
+        ...result,
+        analysisError: error instanceof Error ? error.message : 'Analysis failed.',
+      };
+    }
+
     store.updateRequest(requestId, { status: 'fulfilled', payment: receipt, result }, at);
     store.recordEvent(
       {
@@ -224,7 +258,7 @@ export function createDataRouter(deps: DataRouteDeps): Router {
         spentTodayUsd: microsToUsd(spentAfter),
       },
     });
-  });
+  }
 
   return router;
 }

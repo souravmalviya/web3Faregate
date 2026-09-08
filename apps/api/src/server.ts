@@ -1,5 +1,6 @@
 /** Gateway entrypoint. */
 
+import { AnthropicAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import { createApp } from './app.ts';
 import { describeModes, loadConfig } from './config.ts';
 import { GraphDataProvider, SimulatedDataProvider, type DataProvider } from './data/provider.ts';
@@ -20,7 +21,12 @@ const dataProvider: DataProvider =
       })
     : new SimulatedDataProvider();
 
-const app = createApp({ config, store, dataProvider });
+const aiProvider: AIProvider =
+  config.ai.mode === 'live' && config.ai.apiKey
+    ? new AnthropicAIProvider({ apiKey: config.ai.apiKey, model: config.ai.model })
+    : new RuleBasedAIProvider();
+
+const app = createApp({ config, store, dataProvider, aiProvider });
 
 app.listen(config.port, () => {
   const modes = describeModes(config);
@@ -33,5 +39,6 @@ app.listen(config.port, () => {
     Boolean,
   );
   console.log(`[faregate] data     ${dataProvider.describe()}`);
+  console.log(`[faregate] ai       ${aiProvider.describe()}`);
   for (const note of notes) console.log(`[faregate] note: ${note}`);
 });

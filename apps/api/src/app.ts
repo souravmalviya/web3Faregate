@@ -21,10 +21,12 @@ import {
   type AccessRequest,
   type Policy,
   type RequestStatus,
+  type ResourceQuery,
 } from '@faregate/shared';
 
 import { paymentMiddlewareFromHTTPServer } from '@x402/express';
 
+import type { AIProvider } from './ai/provider.ts';
 import { describeModes, type AppConfig } from './config.ts';
 import type { DataProvider } from './data/provider.ts';
 import { createHttpResourceServer } from './payment/x402.ts';
@@ -36,9 +38,22 @@ export interface AppDeps {
   config: AppConfig;
   store: GatewayStore;
   dataProvider: DataProvider;
+  aiProvider: AIProvider;
   /** Injected so tests can pin time. */
   now?: () => Date;
 }
+
+type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
+
+/**
+ * Express 4 does not route a rejected promise to the error handler, so an async
+ * handler that throws would hang the request. This forwards the rejection.
+ */
+const wrap =
+  (fn: AsyncHandler) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    fn(req, res, next).catch(next);
+  };
 
 /**
  * Thrown by handlers to produce a structured error response.
@@ -82,7 +97,7 @@ const policySchema = z.object({
 });
 
 export function createApp(deps: AppDeps): Express {
-  const { config, store } = deps;
+  const { config, store, aiProvider } = deps;
   const now = deps.now ?? (() => new Date());
 
   const app = express();
@@ -105,6 +120,10 @@ export function createApp(deps: AppDeps): Express {
         config.ens.reason,
       ].filter(Boolean),
       network: config.payment.network,
+      providers: {
+        data: deps.dataProvider.describe(),
+        ai: aiProvider.describe(),
+      },
     });
   });
 
@@ -183,7 +202,7 @@ export function createApp(deps: AppDeps): Express {
    * request is cleared to proceed, the price the agent must pay. Data is only
    * released by the paid `/data/:id` route once a payment has settled.
    */
-  app.post('/requests', (req: Request, res: Response) => {
+  app.post('/requests', wrap(async (req: Request, res: Response) => {
     const parsed = createRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new HttpError(400, 'invalid_request', parsed.error.issues[0]?.message ?? 'Invalid request.');
@@ -203,9 +222,26 @@ export function createApp(deps: AppDeps): Express {
     }
 
     const at = now();
-    const parseResult = rawQuery !== undefined
-      ? parseStructuredQuery(rawQuery)
-      : parsePrompt(prompt ?? '');
+
+    // A structured query is validated directly. A prompt goes through the
+    // interpreter, whose proposal is untrusted and is validated by the same
+    // rule-based parser. If the proposal fails validation, the rule-based
+    // parser has the final word. The model can suggest; it cannot widen scope.
+    let parseResult: { query: ResourceQuery | null; note: string };
+    let interpretedBy: AIProvider['name'] | 'structured' = 'structured';
+    if (rawQuery !== undefined) {
+      parseResult = parseStructuredQuery(rawQuery);
+    } else {
+      const interpretation = await aiProvider.interpret(prompt ?? '');
+      const validated = parseStructuredQuery(interpretation.proposal);
+      if (validated.query) {
+        parseResult = { query: validated.query, note: interpretation.rationale };
+        interpretedBy = interpretation.provider;
+      } else {
+        parseResult = parsePrompt(prompt ?? '');
+        interpretedBy = 'rule-based';
+      }
+    }
 
     const agent = store.getAgent(agentId);
     const policy = agent ? store.getPolicy(agentId) : null;
@@ -251,7 +287,7 @@ export function createApp(deps: AppDeps): Express {
         actor: 'agent',
         agentId,
         requestId: request.id,
-        detail: { prompt: request.prompt, parseNote: parseResult.note },
+        detail: { prompt: request.prompt, parseNote: parseResult.note, interpretedBy },
       },
       at,
     );
@@ -288,8 +324,25 @@ export function createApp(deps: AppDeps): Express {
       );
     }
 
-    res.status(decision.allowed ? 201 : 403).json({ request, parseNote: parseResult.note });
-  });
+    res.status(decision.allowed ? 201 : 403).json({
+      request,
+      parseNote: parseResult.note,
+      interpretedBy,
+    });
+  }));
+
+  /**
+   * Explains a decision in prose, on demand. The explanation narrates what the
+   * deterministic engine already decided; it is never an input to it.
+   */
+  app.get('/requests/:id/explain', wrap(async (req: Request, res: Response) => {
+    const request = store.getRequest(String(req.params.id));
+    if (!request) throw new HttpError(404, 'request_not_found', 'No such request.');
+    if (!request.decision) throw new HttpError(409, 'not_evaluated', 'Request has no decision yet.');
+    const agent = store.getAgent(request.agentId);
+    const explanation = await aiProvider.explain(request.decision, request.query, agent);
+    res.json({ requestId: request.id, explanation, provider: aiProvider.name });
+  }));
 
   app.get('/requests', (_req: Request, res: Response) => {
     res.json({ requests: store.listRequests() });
@@ -361,7 +414,7 @@ export function createApp(deps: AppDeps): Express {
     const httpResourceServer = createHttpResourceServer({ config, store, now });
     app.use(paymentMiddlewareFromHTTPServer(httpResourceServer));
   }
-  app.use(createDataRouter({ config, store, dataProvider: deps.dataProvider, now }));
+  app.use(createDataRouter({ config, store, dataProvider: deps.dataProvider, aiProvider, now }));
 
   // --- audit -------------------------------------------------------------
 

@@ -1,0 +1,25 @@
+{
+  "name": "@faregate/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A demo AI agent that requests onchain data from Faregate and pays for it over x402.",
+  "bin": {
+    "faregate-agent": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "node src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@faregate/shared": "*",
+    "@x402/core": "^2.25.0",
+    "@x402/fetch": "^2.25.0",
+    "@x402/hedera": "^2.25.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

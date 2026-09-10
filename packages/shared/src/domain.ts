@@ -41,6 +41,23 @@ export const RESOURCE_LABELS: Record<ResourceKind, string> = {
 
 export type AgentStatus = 'active' | 'revoked' | 'expired';
 
+/**
+ * Derives a passport name from a human label: `ResearchBot` under
+ * `agents.faregate.eth` becomes `researchbot.agents.faregate.eth`. The
+ * dashboard and the gateway both use this so the name a human signs for is
+ * the name the gateway creates.
+ */
+export function agentIdFromLabel(label: string, parentName: string): string {
+  const slug = label
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/g, '');
+  return `${slug || 'agent'}.${parentName.toLowerCase()}`;
+}
+
 export interface Agent {
   /** ENS passport name, for example `research.agents.faregate.eth`. */
   id: AgentId;
@@ -166,6 +183,8 @@ export interface ApprovalRecord {
   /** Wallet address of the human who acted. */
   by: Address;
   at: string;
+  /** True when the gateway verified a wallet signature from `by` for this decision. */
+  signed?: boolean;
   note?: string;
 }
 

@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test src/pricing.test.ts src/policy.test.ts"
+    "test": "node --test src/pricing.test.ts src/policy.test.ts src/actions.test.ts"
   },
   "devDependencies": {
     "typescript": "^5.7.2",

@@ -9,7 +9,7 @@ it says otherwise.
 ```bash
 npm install && cp .env.example .env
 npm run build --workspace @faregate/shared
-npm test                       # 113 tests
+npm test                       # 115 tests
 npm run dev:api                # :8402
 npm run dev:web                # :3000
 ```
@@ -121,21 +121,34 @@ an onchain act and the gateway fails closed.
   closed under the parent name.
 - `apps/api/src/app.ts`, `POST /agents/:id/revoke`: refuses ENS passports
   with `409 revoke_onchain`.
-- `scripts/ens/passport.ts` and `docs/ens-passports.md`.
+- `scripts/ens/setup.ts` (the whole ENSv2 setup in one command, every call
+  simulated before it is sent), `scripts/ens/passport.ts` (onchain revoke and
+  records) and `docs/ens-passports.md`.
 
-**Run.** Set `ENS_RPC_URL` (a public Sepolia RPC works). `/health` reports
-`ens: live` and names the resolver. With passports minted under
-`agents.faregate.eth` per `docs/ens-passports.md`, the dashboard labels them
-`ENS passport`, and `scripts/ens/passport.ts revoke --send` makes the next
-agent request fail with `agent_revoked` without any call to the gateway.
+**Run.** `npm run ens:setup -- --send` registers the names (see
+`docs/ens-passports.md`). Then set `ENS_RPC_URL` (a public Sepolia RPC works).
+`/health` reports `ens: live` and names the resolver, the dashboard labels the
+passports `ENS passport`, and
+`npm run ens:revoke -- research.agents.faregate.eth` makes the next agent
+request fail with `agent_revoked` without any call to the gateway.
 
 **Not hardcoded.** Every value the gateway acts on is read from the chain at
 request time. The only constant is the Universal Resolver address from the ENS
 deployments page, and it is overridable.
 
-**Status.** Read side implemented and typechecked against viem. Minting on
-Sepolia requires a funded wallet, which is the operator's step; the script
-dry-runs by default and cites the ENS docs page for each interface it uses.
+**Status.** Live on Sepolia since 2026-09-10. `faregate.eth`,
+`agents.faregate.eth`, `research.agents.faregate.eth` and
+`trial.agents.faregate.eth` are registered, and the gateway resolves both
+passports through `UniversalResolverV2`.
+
+| What | Where |
+|---|---|
+| PermissionedResolver holding every record | [`0xc305b40688D41bf05635Ab6cbc1ec0cb7FF18862`](https://sepolia.etherscan.io/address/0xc305b40688D41bf05635Ab6cbc1ec0cb7FF18862) |
+| `faregate.eth` registry | [`0x2d178944a4DF4EF7517024a9ed303686A965EEfD`](https://sepolia.etherscan.io/address/0x2d178944a4DF4EF7517024a9ed303686A965EEfD) |
+| `agents.faregate.eth` registry | [`0x6D3F328C31Bf0275eA4563e276e27B3d39eDFeCc`](https://sepolia.etherscan.io/address/0x6D3F328C31Bf0275eA4563e276e27B3d39eDFeCc) |
+| `faregate.eth` registration | [transaction](https://sepolia.etherscan.io/tx/0xf59ea59a5ae180bc62d51e0b3ef5b36850e6bab5015da6e74e966378861ffa2a) |
+| `research.agents.faregate.eth` records | [transaction](https://sepolia.etherscan.io/tx/0x1bb5f46d0fbeec04e896318a365b58719e224a45d837df2153abc4fd610e055a) |
+| `trial.agents.faregate.eth` records | [transaction](https://sepolia.etherscan.io/tx/0x1349b377989c4d8ab0579c9b4a5b12aecbff00a5b1e2046a95fc07ba8bd0b10e) |
 
 ---
 
@@ -145,8 +158,8 @@ dry-runs by default and cites the ENS docs page for each interface it uses.
 
 **Read.** `docs/openapi.yaml`.
 
-**Status.** The Bazantic gateway and recipe are created on bazantic.com by the
-operator; this repository supplies the API and its description.
+**Status.** Not pursued in this build window. `docs/openapi.yaml` describes
+the API if a Bazantic gateway is added later.
 
 ---
 

@@ -17,8 +17,8 @@ and the evidence so a judge can check.
 | Hedera | $6,000 | Live x402-gated service on Hedera settled via Blocky402; an agent completes a real paid request; README; video of 5 min or less | `GET /data/:id` is x402-gated, priced per query in USDC; `apps/agent` pays | `@x402/core`, `@x402/express`, `@x402/hedera` v2.25; gateway account `0.0.10457565`; facilitator `api.testnet.blocky402.com` checked at startup | Gate, policy re-check, spend ledger, replay: `apps/api/src/app.test.ts` | Live `402` with `PAYMENT-REQUIRED` verified 2026-09-10; settlement pending faucet USDC for the agent account | IMPLEMENTED, TESTED |
 | The Graph | $5,000 | Graph as load-bearing data; live Studio data; meaningful reasoning or NL interface; open source; video 2 to 4 min; Start Fresh pool | Sole data source; NL interpretation; grounded analysis | `apps/api/src/data/provider.ts`, `apps/api/src/ai/provider.ts`; Bearer-auth gateway queries | Grounding and provider tests | Live run 2026-09-10: NL ask, OpenRouter interpretation, Graph data from Aave, Compound and Spark, grounded summary | DEMONSTRATED |
 | The Graph | $5,000 | Standardized subgraphs: one query across many protocols; show what the standard made easier | Messari-standard documents, multi-protocol fan-out | `GRAPH_SUBGRAPHS` targets; `GraphDataProvider.fetch` fan-out keyed by protocol | 10 fan-out tests including schema conformance to Messari lending 3.1.0 | All five documents live against three protocols with no schema errors, 2026-09-10 | DEMONSTRATED |
-| ENS | $4,500 | Built on ENSv2 Sepolia; central; functional, nothing hardcoded; video or live demo | Passports as ENSv2 subnames; capability in text records; live resolution; onchain revocation; fail closed | `apps/api/src/identity/*`, `scripts/ens/passport.ts` | Resolver typechecked against viem; identity service behaviour covered through the app tests | Needs a funded Sepolia wallet to mint passports | IMPLEMENTED |
-| Bazantic | $2,000 | Create a gateway and recipe on bazantic.com for the project's API | The gateway is a small documented x402 API | `docs/openapi.yaml` | n/a | Operator work on bazantic.com | TARGET |
+| ENS | $4,500 | Built on ENSv2 Sepolia; central; functional, nothing hardcoded; video or live demo | Passports as ENSv2 subnames; capability in text records; live resolution; onchain revocation; fail closed | `apps/api/src/identity/*`, `scripts/ens/setup.ts`, `scripts/ens/passport.ts` | ENS-mode create and revoke rules in `apps/api/src/app.test.ts`; the setup simulates every call before sending it | `faregate.eth` and two passports registered on Sepolia 2026-09-10 and resolved live by the gateway; addresses in `docs/bounty-evidence.md` | DEMONSTRATED |
+| Bazantic | $2,000 | Create a gateway and recipe on bazantic.com for the project's API | Not built | | | | NOT PURSUED |
 | World, Privy, Arc, Ledger, 1inch, Uniswap, Chainlink | | | | | | | NOT PURSUED |
 
 ---
@@ -202,15 +202,24 @@ refused at its next request.
   behaviour for names under the passport parent.
 - `POST /agents/:id/revoke` refuses to revoke an ENS passport locally and
   tells the human to do it onchain.
+- `scripts/ens/setup.ts`: the whole ENSv2 setup in one command.
+  `scripts/ens/passport.ts`: onchain revocation (`npm run ens:revoke`).
 
-**Implementation status.** `IMPLEMENTED` on the read side. Registering
-`faregate.eth` on Sepolia, deploying a `UserRegistry` for `agents.faregate.eth`
-and minting the demo passports requires a funded Sepolia wallet, which the
-operator supplies. Until then passports resolve from the local store and the
-dashboard says so.
+**Implementation status.** `DEMONSTRATED`. On 2026-09-10,
+`npm run ens:setup -- --send` registered `faregate.eth` through the ENSv2
+ETHRegistrar (fee paid in Sepolia MockUSDC), deployed a PermissionedResolver
+and two UserRegistry proxies through the VerifiableFactory, registered
+`agents.faregate.eth` and the `research` and `trial` passports, and wrote
+their records: 14 transactions, each simulated before it was sent. The gateway
+runs with `ENS_RPC_URL` set and resolves both passports live. With ENS live,
+the gateway refuses to create a passport under the parent (`409
+create_onchain`) or to revoke one (`409 revoke_onchain`), because the chain is
+their only authority. Addresses and transactions are in
+`docs/bounty-evidence.md`.
 
-**Confidence.** Medium. ENSv2 contracts are beta and the docs say they may
-change.
+**Confidence.** High on the working demo. ENSv2 is beta on Sepolia and ENS may
+reset its state on a redeploy; `npm run ens:setup -- --send` rebuilds
+everything if that happens.
 
 **Official documentation.** https://docs.ens.domains/ensv2/permissioned-registry ,
 https://docs.ens.domains/ensv2/tutorial-contract-developers ,
@@ -231,11 +240,10 @@ flow, record it, and provide the Bazantic username.
 documented surface (`POST /requests`, `GET /data/:id`). That is exactly what a
 Bazantic gateway wraps.
 
-**Implementation status.** `TARGET`. This is dashboard work on bazantic.com
-done by the operator, plus an OpenAPI description of the gateway which is
-planned.
-
-**Confidence.** Medium.
+**Implementation status.** `NOT PURSUED`. It needs the gateway hosted
+publicly, an account and a separate recording on bazantic.com, which would
+have delayed the submission. `docs/openapi.yaml` describes the API if a
+gateway is added later.
 
 ---
 

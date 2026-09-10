@@ -47,6 +47,18 @@ From the ENS deployments page, https://docs.ens.domains/learn/deployments :
 The gateway uses `UniversalResolverV2` by default; override with
 `ENS_UNIVERSAL_RESOLVER` if ENS redeploys.
 
+## Faregate on Sepolia
+
+Registered 2026-09-10 with `npm run ens:setup -- --send`.
+
+| Name or contract | Address |
+|---|---|
+| Owner (throwaway test account) | `0x049226D69f85DE4090f89675e79fa25AF86CB71d` |
+| PermissionedResolver | `0xc305b40688D41bf05635Ab6cbc1ec0cb7FF18862` |
+| `faregate.eth` registry | `0x2d178944a4DF4EF7517024a9ed303686A965EEfD` |
+| `agents.faregate.eth` registry | `0x6D3F328C31Bf0275eA4563e276e27B3d39eDFeCc` |
+| Passports | `research.agents.faregate.eth`, `trial.agents.faregate.eth` |
+
 ## Setting up the names
 
 One command does the whole setup on Sepolia, at no real cost:
@@ -110,13 +122,21 @@ key only.
 ## Revoking a passport
 
 ```bash
-node scripts/ens/passport.ts revoke \
-  --name research.agents.faregate.eth --resolver <PermissionedResolver proxy> --send
+npm run ens:revoke -- research.agents.faregate.eth
 ```
 
-This sets `faregate.status` to `revoked`. The gateway's `POST /agents/:id/revoke`
-deliberately refuses to do this for an ENS passport and tells the human to run
-this instead, because the gateway does not hold a key and should not.
+This sets `faregate.status` to `revoked` with the owner's key, on the resolver
+`ens:setup` saved in `data/ens-setup.json` (pass `--resolver` for another). The
+gateway's `POST /agents/:id/revoke` deliberately refuses to do this for an ENS
+passport and tells the human to do it onchain, because the gateway does not
+hold a key and should not.
+
+To put every demo passport back to its original records, for example between
+demo takes:
+
+```bash
+npm run ens:restore
+```
 
 Unregistering the subname entirely also revokes: the name stops resolving, the
 passport is unknown, and the agent is refused.

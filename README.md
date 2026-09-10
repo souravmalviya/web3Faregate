@@ -113,7 +113,7 @@ apps/api        the gateway (Express, TypeScript)
 apps/web        the dashboard (Next.js)
 apps/agent      the demo agent, a real x402 client in its own process
 packages/shared domain model, pricing, policy engine (pure, tested)
-scripts/ens     mint and revoke ENS passports with the owner's wallet
+scripts/ens     one-command ENSv2 setup, onchain revoke and restore of passports
 scripts/hedera  create the gateway account, check and associate USDC
 docs/           ARCHITECTURE, DECISIONS, DEMO_SCRIPT, SECURITY, SPONSOR_MATRIX, bounty evidence, ENS guide, OpenAPI
 ```
@@ -128,8 +128,7 @@ per-bounty breakdown with file references and honest status is in
 |---|---|---|
 | **Hedera** | x402 payment rail. `@x402/core`, `@x402/express`, `@x402/hedera` v2.25, network `hedera:testnet`, USDC `0.0.429274`. Per-query metering. | `apps/api/src/payment/x402.ts`, `apps/agent/src/index.ts` |
 | **The Graph** | The only data source. Messari-standard documents fan out across protocol subgraphs; Bearer-authenticated gateway queries; the model's analysis is grounded against the result. | `apps/api/src/data/provider.ts`, `apps/api/src/ai/provider.ts` |
-| **ENS** | Agent passports as ENSv2 subnames on Sepolia, capability in text records, live resolution through `UniversalResolverV2`, revocation onchain. | `apps/api/src/identity/`, `scripts/ens/passport.ts` |
-| **Bazantic** | The gateway is a small, documented x402 API. [docs/openapi.yaml](docs/openapi.yaml) describes it for an agent recipe. | `docs/openapi.yaml` |
+| **ENS** | Agent passports as ENSv2 subnames on Sepolia, capability in text records, live resolution through `UniversalResolverV2`, revocation onchain. Live on Sepolia: [evidence](docs/bounty-evidence.md#ens-best-use-of-ensv2). | `apps/api/src/identity/`, `scripts/ens/setup.ts`, `scripts/ens/passport.ts` |
 
 ## Security, in brief
 
@@ -207,7 +206,8 @@ Turn subsystems live one at a time in `.env`:
 | `ENS_RPC_URL` | unset (passports local) | Sepolia RPC for ENSv2 resolution |
 | `FAREGATE_PARENT_NAME` | `agents.faregate.eth` | Parent name passports live under |
 | `ENS_UNIVERSAL_RESOLVER` | ENSv2 beta address | Override only if ENS redeploys |
-| `ENS_OWNER_PRIVATE_KEY` | unset | Read only by `scripts/ens/passport.ts` |
+| `ENS_OWNER_PRIVATE_KEY` | unset | Throwaway Sepolia key, read only by `scripts/ens` (`ens:setup`, `ens:revoke`, `ens:restore`) |
+| `ENS_SETUP_RPC_URL` | public Sepolia RPC | RPC for the ENS scripts, kept apart from `ENS_RPC_URL` |
 | `NEXT_PUBLIC_FAREGATE_GATEWAY_URL` | `http://localhost:8402` | Where the dashboard finds the gateway |
 
 ### Networks

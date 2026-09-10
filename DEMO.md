@@ -37,7 +37,7 @@ at a time and watch `GET /health` flip it from `simulated` to `live`.
 | Payment (agent side) | `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` (throwaway testnet key, ECDSA) |
 | Data | `GRAPH_API_KEY`, `GRAPH_SUBGRAPHS=aave-v3=<id>,compound-v3=<id>` |
 | AI | `OPENROUTER_API_KEY` (optionally `OPENROUTER_MODEL`) |
-| Identity | `ENS_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com` |
+| Identity | `ENS_OWNER_PRIVATE_KEY` (throwaway Sepolia key), run `npm run ens:setup -- --send`, then `ENS_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com` |
 
 ## Install and start
 
@@ -65,12 +65,15 @@ two passports: **Treasury Research Agent** and **Trial Scout Agent**.
 
 ## The flow
 
-### 0. Create an agent (optional)
+### 0. Create an agent (optional, local mode only)
 
-Dashboard: **New agent**, keep the defaults (`ResearchBot`, $0.10 per query,
-approval above $0.02, $1.00 daily), **Create and sign**, sign in the wallet.
-The card appears as `researchbot.agents.faregate.eth`. The two seeded
-passports work too.
+With ENS simulated: dashboard **New agent**, keep the defaults (`ResearchBot`,
+$0.10 per query, approval above $0.02, $1.00 daily), **Create and sign**, sign
+in the wallet. The card appears as `researchbot.agents.faregate.eth`.
+
+With ENS live, passports are ENS names and the dashboard does not create them.
+The two demo passports come from `npm run ens:setup -- --send` and show as
+**ENS passport**.
 
 ### 1. An agent asks
 
@@ -107,8 +110,14 @@ payment       simulated receipt                  (or: a Hedera transaction id)
 
 ### 3. Revoke and retry
 
-Dashboard: **Revoke** on the research agent, then **Confirm revoke**, and sign.
-The card turns red with *Access revoked*.
+Local mode: dashboard **Revoke** on the research agent, then **Confirm
+revoke**, and sign. The card turns red with *Access revoked*.
+
+ENS mode: revoke onchain with the owner's key, and wait for `confirmed`:
+
+```bash
+npm run ens:revoke -- research.agents.faregate.eth
+```
 
 ```bash
 npm run agent
@@ -137,14 +146,17 @@ request from the revoked agent shows **Access denied · agent revoked**.
 ### 4. Reset
 
 State is a snapshot file, so a restart keeps everything, including the
-revocation. To start clean:
+revocation. To start clean, stop the gateway first (Ctrl+C), because it saves
+its state when it exits. Then:
 
 ```bash
-npm run reset      # deletes data/faregate-state.json
+npm run ens:restore   # ENS mode only: both passports back to active onchain
+npm run reset         # deletes data/faregate-state.json
+npm run dev:api
 ```
 
-then restart the gateway; it seeds the two demo passports into the empty
-store.
+The gateway seeds the two demo passports into the empty store and, with ENS
+live, reads them from the chain at startup.
 
 ## Troubleshooting
 

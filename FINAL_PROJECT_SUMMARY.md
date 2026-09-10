@@ -54,7 +54,7 @@ walk and `README.md` for the Mermaid diagram.
 | `apps/api` | The gateway. Identity → interpreter → policy → x402 gate → data → analysis → audit. |
 | `apps/web` | The human's dashboard. Same HTTP API as the agent; no privileged path. |
 | `apps/agent` | A real x402 client in its own process. Narrates each step for the demo. |
-| `scripts/ens` | Mint and revoke passports with the owner's wallet. Dry-runs by default. |
+| `scripts/ens` | One-command ENSv2 setup, onchain revoke and restore with the owner's key. Dry-runs by default. |
 
 The paid route re-evaluates policy three times: before quoting a price (the
 `onProtectedRequest` hook), when pricing, and at release. Spend is recorded at
@@ -79,11 +79,11 @@ collection, not at quote.
 
 | Sponsor | Integration | Status |
 |---|---|---|
-| Hedera | x402-gated data route, per-query USDC pricing, agent that pays, audit trail | Implemented and tested; live settlement needs a funded testnet account |
-| The Graph (AI) | Sole data source; NL interpretation; grounded analysis | Implemented; live query needs a Studio key |
-| The Graph (Composability) | One Messari-standard document fanned out across protocols | Implemented and tested |
-| ENS | ENSv2 passports, live resolution, onchain revocation, fail closed | Read side implemented; minting needs a funded Sepolia wallet |
-| Bazantic | OpenAPI description of the gateway for an agent recipe | Description written; recipe is operator work |
+| Hedera | x402-gated data route, per-query USDC pricing, agent that pays, audit trail | Implemented and tested; the live 402 challenge from Blocky402 is verified; settlement needs testnet USDC in the agent account |
+| The Graph (AI) | Sole data source; NL interpretation; grounded analysis | Live, verified 2026-09-10 |
+| The Graph (Composability) | One Messari-standard document fanned out across protocols | Live across Aave v3, Compound v3 and Spark |
+| ENS | ENSv2 passports, live resolution, onchain revocation, fail closed | Live on Sepolia: `faregate.eth` and two passports registered 2026-09-10 and resolved live |
+| Bazantic | | Not pursued |
 
 Details, file references and honest confidence: `docs/SPONSOR_MATRIX.md` and
 `docs/bounty-evidence.md`.
@@ -115,23 +115,23 @@ signatures prove who acted rather than who was entitled to.
 
 Scripted at 3:30 in `docs/DEMO_SCRIPT.md`; runbook in `DEMO.md`.
 
-0. Human creates `ResearchBot` from the dashboard, signing with their wallet.
+0. The agent's passport is `research.agents.faregate.eth` on Sepolia; its
+   limits are the name's text records.
 1. Agent asks for 30 days of wallet activity. Gateway interprets, prices at
    $0.036, stops for a human.
 2. Human reads the decision and the plain-language explanation, approves.
 3. Agent pays 36,000 atomic USDC units, collects data with provenance and a
    grounded summary.
-4. Agent asks again, human approves again, then revokes the agent.
-5. Agent presents its approved quote. Refused at the gate. Dashboard row and
-   audit trail both show it.
+4. The owner revokes the passport onchain (`npm run ens:revoke`).
+5. The agent asks again and is refused with `agent_revoked`. The dashboard row
+   and the audit trail both show it.
 
 ## 9. Limitations
 
 - State is a local snapshot file; one gateway, one machine.
 - Signatures prove who acted, not that they were entitled to.
-- Live x402 settlement and ENS minting are verified against the packages and
-  docs, and in simulated mode end to end; running them live is the operator's
-  step with funded testnet accounts.
+- Live x402 settlement is verified up to the 402 challenge from Blocky402; a
+  settled payment needs testnet USDC in the agent account.
 - Graph documents target the Messari lending schema only.
 - ENSv2 is beta and its interfaces may change.
 
@@ -149,7 +149,6 @@ subscriptions; a Privy organisation-wallet mode for teams.
 | The Graph, Best AI Use Case (Start Fresh) | Graph is load-bearing; NL interface; reasoning over data; open source; net-new during the event |
 | The Graph, Composable/Standardized | Messari-standard documents, multi-protocol fan-out, leverage shown in the response shape |
 | ENS, Best Use of ENSv2 | Passports on ENSv2 Sepolia, central to the product, nothing hardcoded, revocation onchain |
-| Bazantic recipes | `docs/openapi.yaml` describes the x402 API |
 
 ## 12. Judge FAQ
 

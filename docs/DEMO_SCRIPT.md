@@ -1,151 +1,147 @@
 # Demo script
 
-Target length: 3 minutes 30 seconds. One take, 720p or better, your voice, no
-music. This clears ETHGlobal's finalist rule (2 to 4 minutes), The Graph's
-(2 to 4) and Hedera's (5 or under) at once.
+Target length: about 3 minutes 30 seconds. One take, 720p or better, your own
+voice, no music. That fits ETHGlobal (2 to 4 minutes), The Graph (2 to 4) and
+Hedera (5 or under).
 
-Screen layout: dashboard on the left two-thirds, a terminal on the right third.
-Both visible the whole time. Do not alt-tab.
+Screen layout: the dashboard on the left two-thirds, a terminal on the right
+third. Keep both visible the whole time. Do not switch windows.
 
-Before recording: gateway and dashboard running, terminal in the repo root,
-browser wallet connected on Sepolia, `npm run reset` done and the gateway
-restarted so the queue is empty and only the two seeded passports exist.
+## Before you record
 
-Say every line out loud; the pauses are where the audience reads.
+1. MetaMask is on **Sepolia** and connected to the dashboard. The top right of
+   the dashboard shows your address and Sepolia.
+2. Put the demo back to a clean state. In the terminal running the gateway,
+   press Ctrl+C, then run:
+
+   ```bash
+   npm run ens:restore   # both ENS passports back to active, onchain
+   npm run reset         # empty request queue and audit trail
+   npm run dev:api       # start the gateway again
+   ```
+
+3. The top bar shows **PAYMENT LIVE, DATA LIVE, AI LIVE, ENS LIVE**. If the
+   agent account has no test USDC, see "No test USDC" at the bottom first.
+4. The terminal on the right is open in the `faregate` folder.
+
+Read the quoted lines out loud. Pause where the audience needs to read.
 
 ---
 
-## 0:00 – 0:20  The problem
+## 0:00 to 0:20  The problem
 
-> AI agents are becoming autonomous. To do anything useful onchain they need
-> data and a way to pay for it, and today that means handing them an API key
-> and a card. Then you hope: that they stay in their remit, don't run up a
-> bill, and stop when you want them to stop.
+> AI agents can now work on their own. To be useful they need data, and they
+> need to pay for it. Today that means giving them an API key and a card, and
+> hoping they stay within limits and stop when you ask.
 
-## 0:20 – 0:40  What Faregate is
+## 0:20 to 0:45  What Faregate is
 
 Point at the top bar.
 
-> Faregate is the control and payment layer between a human and their agents.
-> Four subsystems, each telling you whether it is live or simulated. Nothing
-> simulated is ever shown as a chain fact.
+> Faregate is the gate between an agent and paid onchain data. Payment is x402
+> on Hedera, data is The Graph, identity is ENS, and an AI reads questions and
+> writes summaries. All four are live, and the dashboard would say so if any
+> of them were simulated.
 
-## 0:40 – 1:10  Create the agent
+## 0:45 to 1:10  The agent's passport is an ENS name
 
-Click **New agent**. Leave the defaults: `ResearchBot`, $0.10 per query,
-approval above $0.02, $1.00 per day, three wallet resources.
+Point at the Treasury Research Agent card: the **ENS passport** label and the
+limits.
 
-> I'm creating an agent. Not a key: a capability. What it may buy, how much
-> per query, how much per day, and the line above which I have to say yes.
+> This agent's passport is an ENS name on Sepolia,
+> research.agents.faregate.eth. Its limits are text records on that name: ten
+> cents per query, one dollar a day, and anything above two cents needs me.
+> The gateway reads them from the chain on every request. Nothing is
+> hardcoded.
 
-Click **Create and sign**. The wallet pops up.
-
-> My wallet signs the creation. The gateway verifies the signature, so the
-> passport records me as its owner. No transaction, nothing spent.
-
-Sign. The card appears with its passport name.
-
-## 1:10 – 1:50  The agent asks
+## 1:10 to 1:40  The agent asks
 
 Terminal:
 
+```bash
+npm run agent
 ```
-npm run agent -- --agent researchbot.agents.faregate.eth
-```
 
-> This is a separate process speaking x402. It asks for thirty days of
-> activity on a wallet.
+> This is a separate program speaking x402. It asks, in plain English, for a
+> month of activity on a wallet.
 
-The terminal prints the interpreted query, the price and `awaiting_approval`.
+The terminal shows the price, $0.036, and `awaiting_approval`.
 
-> The gateway had the model read the ask and propose a structured query, then
-> re-validated it, priced it at three point six cents, and ran a deterministic
-> policy. Three point six is above my two-cent line, so it stopped for me. The
-> model suggested; it did not decide.
+> The AI turned the question into a query. The gateway priced it at 3.6 cents
+> and checked the rules. That is above my two-cent line, so it stopped and
+> asked me. The AI suggested; the rules decided.
 
-## 1:50 – 2:20  The human decides, and pays nothing
+## 1:40 to 2:10  I approve, the agent pays
 
-Dashboard: the request is at the top. Click **Explain in plain language**,
-read one sentence. Click **Approve**. Sign in the wallet.
+Dashboard: the request is at the top. Click **Approve**, then **Sign** in
+MetaMask.
 
-> Approved, and signed. Now the agent pays, not me.
+> I approve, and my wallet signs it, so there is proof it was me. Now the
+> agent pays, not me.
 
-Terminal: `Approved by a human`, then the payment.
+Terminal: `Approved by a human`, then the payment. Dashboard: open the request
+and point at the payment card and its HashScan link.
 
-> The gateway answered 402. The agent signed a USDC transfer on Hedera
-> testnet for exactly thirty-six thousand atomic units, which is three point
-> six cents, and the facilitator settled it. Six decimals map one to one onto
-> the gateway's pricing unit. No exchange rate anywhere.
+> The agent paid 3.6 cents in USDC on Hedera testnet, and here is the
+> transaction on HashScan.
 
-Dashboard: open the row. Point at the payment card and the HashScan link.
+## 2:10 to 2:40  Real data, checked summary
 
-## 2:20 – 2:50  Real data, grounded analysis
+Point at the data and the summary, then scroll to the timeline.
 
-Point at the data card.
+> The data comes live from The Graph: one query, written once on the Messari
+> standard, run across Aave, Compound and Spark. The AI summary uses only this
+> data, and any address or hash it invents is removed. Every step is on the
+> timeline.
 
-> Live data from The Graph: one query, written once against the Messari
-> standard schema, fanned out across Aave, Compound and Spark. The summary
-> underneath was written by a model that was given this data and nothing
-> else, and then checked: any hash or address it mentions that is not in the
-> data is removed and logged.
-
-Scroll to the timeline under the request.
-
-> Every step is an event. This is what happened to this request.
-
-## 2:50 – 3:20  Revoke
-
-Dashboard: **Revoke** on ResearchBot, **Confirm revoke**, sign.
-
-> I've changed my mind. One signed action.
-
-The card turns red: *Access revoked*.
-
-## 3:20 – 3:40  The same agent tries again
+## 2:40 to 3:10  I revoke the agent onchain
 
 Terminal:
 
-```
-npm run agent -- --agent researchbot.agents.faregate.eth
-```
-
-It prints:
-
-```
-✗ The gateway refused this request. The agent gets nothing and pays nothing.
-  reason  agent_revoked
+```bash
+npm run ens:revoke -- research.agents.faregate.eth
 ```
 
-Dashboard: the new row reads **Access denied · agent revoked**.
+Wait for the `confirmed` line.
 
-> Same agent, same request. Refused by the deterministic policy before any
-> price was quoted. The agent got nothing and paid nothing. And if it had
-> been holding an approved quote from before, the gate would have refused
-> that too.
+> I've changed my mind. I set the passport's status to revoked on the ENS name
+> itself. That's a Sepolia transaction from the owner's key. The gateway holds
+> no key, so it cannot undo this.
+
+## 3:10 to 3:30  The same agent tries again
+
+Terminal:
+
+```bash
+npm run agent
+```
+
+The terminal says the gateway refused the request with `agent_revoked`. On the
+dashboard the new row reads **Access denied · agent revoked**, and the card
+turns red.
+
+> Same agent, same question. The gateway read the chain, saw the revocation,
+> and refused. The agent got nothing and paid nothing.
 
 ## Close
 
-> Agents act on their own. Humans keep control of what they access and what
-> they spend. Identity is ENS, payment is x402 on Hedera, data is The Graph,
-> and the decision is never the model's. Faregate.
+> Agents act on their own. Humans stay in control of what they buy and what
+> they spend. Faregate.
 
 Stop recording.
 
 ---
 
-## Recovery notes
+## If something goes wrong
 
-- **Wallet does not pop up.** The dashboard needs an injected wallet on
-  Sepolia. Reconnect from the top bar; if it still fails, set
-  `FAREGATE_REQUIRE_SIGNED_ACTIONS=false` in `.env`, restart the gateway, and
-  say "unsigned for the demo"; the audit trail will show it.
-- **Approval poll times out.** Re-run the agent with `--wait 120`.
-- **Payment simulated.** The agent has no `HEDERA_ACCOUNT_ID`, or the gateway
-  has no `FAREGATE_PAY_TO`. The receipt says `simulated`; say so out loud
-  rather than hiding it.
-- **Wrong approval threshold.** A 30-day activity query costs $0.036. The
-  threshold must be below that (the default is $0.02) or the request clears
-  without you.
-- **Reset between takes.** `npm run reset`, then restart the gateway. State
-  is a snapshot file; restarting alone keeps everything, including the
-  revocation.
+- **No test USDC in the agent account.** Before recording, change
+  `FAREGATE_PAY_TO=0.0.10457565` to `FAREGATE_PAY_TO=` in `.env` and restart
+  the gateway. The top bar shows PAYMENT SIMULATED. Say "payment is simulated
+  in this recording" out loud.
+- **MetaMask does not pop up.** Click the MetaMask icon; the request may be
+  waiting there. Check that the dashboard shows Sepolia at the top right.
+- **The agent stops waiting before you approve.** Run
+  `npm run agent -- --wait 300` to give yourself five minutes.
+- **The revoke is slow.** Sepolia takes 10 to 30 seconds. Wait for
+  `confirmed` before running the agent again.
+- **Another take.** Repeat step 2 of "Before you record".

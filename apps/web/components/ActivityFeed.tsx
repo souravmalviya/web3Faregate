@@ -2,7 +2,7 @@
 
 import type { AuditEvent, AuditEventType } from '@faregate/shared';
 
-import { shortHash, timeAgo } from '@/lib/api';
+import { shortAddress, shortHash, timeAgo } from '@/lib/api';
 
 import { Empty, Pill, Section, type Tone } from './ui';
 
@@ -24,15 +24,26 @@ const EVENT_TONE: Record<AuditEventType, Tone> = {
   'request.failed': 'stop',
 };
 
+function signedBy(d: Record<string, unknown>): string {
+  if (!d.by) return '';
+  return `by ${shortAddress(String(d.by))}${d.signed ? ' · wallet signed' : d.signed === false ? ' · unsigned' : ''}`;
+}
+
 function describe(event: AuditEvent): string {
   const d = event.detail as Record<string, unknown>;
   switch (event.type) {
+    case 'agent.created':
+      return `${String(d.label ?? '')} ${signedBy(d)}`;
+    case 'agent.revoked':
+    case 'policy.updated':
+    case 'request.approved':
+      return signedBy(d);
     case 'request.received':
       return `“${String(d.prompt ?? '').slice(0, 80)}”`;
     case 'request.evaluated':
       return `${d.allowed ? 'allowed' : 'denied'} · ${(d.reasons as string[] | undefined)?.join(', ') ?? ''}`;
     case 'request.rejected':
-      return (d.reasons as string[] | undefined)?.join(', ') ?? String(d.reason ?? '');
+      return d.by ? signedBy(d) : ((d.reasons as string[] | undefined)?.join(', ') ?? String(d.reason ?? ''));
     case 'payment.required':
       return `${String(d.amountMicros)} units of ${String(d.asset)} on ${String(d.network)}`;
     case 'payment.verified':
@@ -49,9 +60,6 @@ function describe(event: AuditEvent): string {
     }
     case 'request.fulfilled':
       return `spent today $${Number(d.spentTodayUsd ?? 0).toFixed(4)}`;
-    case 'request.approved':
-    case 'policy.updated':
-    case 'agent.revoked':
     default:
       return '';
   }

@@ -13,11 +13,18 @@
  *   npm run agent -- --scenario revoked
  */
 
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 
 import { wrapFetchWithPayment, x402Client } from '@x402/fetch';
 import { ExactHederaScheme, PrivateKey, createClientHederaSigner } from '@x402/hedera';
+
+// Load .env from the repository root rather than the process cwd. `npm run agent`
+// runs with apps/agent as the working directory, where there is no .env, so a
+// cwd-relative load would silently leave the agent without its wallet.
+loadDotenv({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env') });
 
 const GATEWAY = process.env.FAREGATE_GATEWAY_URL ?? 'http://localhost:8402';
 const NETWORK = process.env.FAREGATE_NETWORK ?? 'hedera:testnet';

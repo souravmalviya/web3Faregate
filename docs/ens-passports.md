@@ -108,6 +108,10 @@ FAREGATE_PARENT_NAME=agents.faregate.eth
 Reads are free, so a public RPC works. Once set, `/health` reports
 `ens: live`, and the dashboard labels resolved passports `ENS passport`.
 
+Mint the demo passports before setting `ENS_RPC_URL`. The seeded demo agents
+are named under `agents.faregate.eth`, so once ENS is live the chain is the
+only authority for them, and a name with no passport is refused.
+
 ## Caveat
 
 ENSv2 is beta on Sepolia and the ENS documentation says the interfaces may

@@ -20,7 +20,7 @@ keystore/
 secrets/
 
 # local data
-data/
+/data/
 *.sqlite
 *.db
 

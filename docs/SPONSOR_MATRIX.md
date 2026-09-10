@@ -104,8 +104,7 @@ whose output is grounding-checked against the data.
 
 **Implementation status.** `IMPLEMENTED`. Live query requires `GRAPH_API_KEY`
 and a subgraph id or URL. The GraphQL documents target the Messari standard
-schema; the operator pins a subgraph that publishes it (Aave v3 is the chosen
-demo target).
+schema; the operator pins a subgraph that publishes it (`.env.example` ships Messari's registry ids for Aave v3, Compound v3 and Spark on Ethereum).
 
 **Demo evidence.** A fulfilled request in the dashboard with provenance
 `the-graph`, the raw data panel, and the grounded analysis.

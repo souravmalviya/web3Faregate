@@ -106,9 +106,12 @@ cache. `EnsIdentityService` decides what to do with the answer:
 | No passport | **denied** (a local row cannot resurrect it) | local store |
 | RPC failure | **denied** (fail closed) | local store, noted |
 
-The two demo agents live outside the parent namespace by default so the demo
-runs without any chain access; with `ENS_RPC_URL` set, real passports under
-`agents.faregate.eth` take precedence and the local ones keep working.
+The two demo agents are named under the passport parent
+(`research.agents.faregate.eth`, `trial.agents.faregate.eth`) and resolve
+from the local store while ENS is simulated. Setting `ENS_RPC_URL` makes the
+chain authoritative for those names, so mint real passports with the same names
+first. Until then the gateway refuses both agents, which is fail-closed working
+as designed.
 
 ## Payment
 

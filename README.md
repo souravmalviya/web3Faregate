@@ -152,7 +152,7 @@ Threat model and limits: [SECURITY.md](SECURITY.md).
 ## Setup
 
 ```bash
-git clone <this repo> faregate && cd faregate
+git clone https://github.com/souravmalviya/web3Faregate.git faregate && cd faregate
 npm install
 cp .env.example .env
 npm run build --workspace @faregate/shared

@@ -68,8 +68,8 @@ collection, not at quote.
 - viem for ENS resolution and wallet reads. ENSv2 `UniversalResolverV2` on
   Sepolia.
 - The Graph gateway over HTTPS with Bearer auth.
-- `@anthropic-ai/sdk` with `messages.parse` (Zod output format) and
-  server-side refusal fallbacks. Default model `claude-opus-5`.
+- OpenRouter chat completions over fetch, with strict JSON-schema structured
+  outputs for interpretation. Default model `openai/gpt-4.1-mini`, configurable.
 - Zod for input validation. Node's built-in test runner. No database, no
   custom contracts, on purpose.
 

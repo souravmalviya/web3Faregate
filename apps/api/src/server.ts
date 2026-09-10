@@ -1,6 +1,6 @@
 /** Gateway entrypoint. */
 
-import { AnthropicAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
+import { OpenRouterAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import type { x402HTTPResourceServer } from '@x402/core/server';
 
 import { createApp } from './app.ts';
@@ -32,7 +32,7 @@ const dataProvider: DataProvider =
 
 const aiProvider: AIProvider =
   config.ai.mode === 'live' && config.ai.apiKey
-    ? new AnthropicAIProvider({ apiKey: config.ai.apiKey, model: config.ai.model })
+    ? new OpenRouterAIProvider({ apiKey: config.ai.apiKey, model: config.ai.model })
     : new RuleBasedAIProvider();
 
 // ENS is the source of truth for passports when it is configured. The two

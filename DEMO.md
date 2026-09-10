@@ -35,7 +35,7 @@ at a time and watch `GET /health` flip it from `simulated` to `live`.
 | Payment (gateway side) | `FAREGATE_PAY_TO=0.0.xxxxx` (a Hedera testnet account associated with USDC `0.0.429274`), `X402_FACILITATOR_URL` |
 | Payment (agent side) | `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` (throwaway testnet key, ECDSA) |
 | Data | `GRAPH_API_KEY`, `GRAPH_SUBGRAPHS=aave-v3=<id>,compound-v3=<id>` |
-| AI | `ANTHROPIC_API_KEY` |
+| AI | `OPENROUTER_API_KEY` (optionally `OPENROUTER_MODEL`) |
 | Identity | `ENS_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com` |
 
 ## Install and start

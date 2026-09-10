@@ -9,7 +9,7 @@ it says otherwise.
 ```bash
 npm install && cp .env.example .env
 npm run build --workspace @faregate/shared
-npm test                       # 80 tests
+npm test                       # 86 tests
 npm run dev:api                # :8402
 npm run dev:web                # :3000
 ```
@@ -66,7 +66,7 @@ language, and the model's summary is grounded against the retrieved data.
 - `apps/api/src/data/provider.ts`, `GraphDataProvider.queryOne`: POST to
   `https://gateway.thegraph.com/api/subgraphs/id/<id>` with
   `Authorization: Bearer <GRAPH_API_KEY>`.
-- `apps/api/src/ai/provider.ts`, `AnthropicAIProvider.interpret` (structured
+- `apps/api/src/ai/provider.ts`, `OpenRouterAIProvider.interpret` (structured
   output) and `analyze` + `groundAnalysis`.
 
 **Run (live).** Set `GRAPH_API_KEY` and `GRAPH_SUBGRAPHS=aave-v3=<id>`. Submit

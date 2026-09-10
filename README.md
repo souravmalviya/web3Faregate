@@ -97,7 +97,7 @@ flowchart TB
   I -.resolves.-> ENS[(ENSv2 on Sepolia<br/>Universal Resolver)]
   G -.verify / settle.-> F[(x402 facilitator<br/>Hedera testnet, USDC)]
   D -.GraphQL.-> TG[(The Graph gateway<br/>subgraphs per protocol)]
-  AN -.-> M[(Claude<br/>via Anthropic SDK)]
+  AN -.-> M[(LLM via OpenRouter<br/>default openai/gpt-4.1-mini)]
 ```
 
 Every external dependency is optional. The gateway starts with all four
@@ -172,7 +172,7 @@ Turn subsystems live one at a time in `.env`:
 |---|---|---|
 | Payment | `FAREGATE_PAY_TO`, `X402_FACILITATOR_URL` | A Hedera testnet account associated with USDC `0.0.429274`. The agent additionally needs `HEDERA_ACCOUNT_ID` and `HEDERA_PRIVATE_KEY`. |
 | Data | `GRAPH_API_KEY`, `GRAPH_SUBGRAPHS` | A Subgraph Studio key and `protocol=subgraphId` pairs for subgraphs on the Messari standard schema. |
-| AI | `ANTHROPIC_API_KEY` | An Anthropic key. Default model `claude-opus-5`. |
+| AI | `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` | An OpenRouter key. Default model `openai/gpt-4.1-mini`, which supports strict structured outputs. |
 | Identity | `ENS_RPC_URL` | Any Sepolia RPC; reads only, so a public one works. |
 
 `GET /health` tells you what is live.
@@ -198,7 +198,7 @@ npm run agent -- --agent research.agents.faregate.eth --request <id>
 ## Tests
 
 ```bash
-npm test          # 80 tests: policy engine, pricing, store, AI grounding, data fan-out, HTTP surface
+npm test          # 86 tests: policy engine, pricing, store, AI grounding, data fan-out, HTTP surface
 npm run typecheck
 npm run build
 ```

@@ -12,7 +12,6 @@
     "test": "node --test src/app.test.ts src/config.test.ts src/store.test.ts src/ai/provider.test.ts src/data/provider.test.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
     "@faregate/shared": "*",
     "@x402/core": "^2.25.0",
     "@x402/express": "^2.25.0",

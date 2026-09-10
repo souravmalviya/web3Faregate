@@ -180,7 +180,7 @@ paths:
                 properties:
                   requestId: { type: string }
                   explanation: { type: string }
-                  provider: { type: string, enum: [anthropic, rule-based] }
+                  provider: { type: string, enum: [openrouter, rule-based] }
 
   /requests/{id}/approval:
     post:
@@ -435,7 +435,7 @@ components:
       properties:
         request: { $ref: '#/components/schemas/AccessRequest' }
         parseNote: { type: string }
-        interpretedBy: { type: string, enum: [anthropic, rule-based, structured] }
+        interpretedBy: { type: string, enum: [openrouter, rule-based, structured] }
 
     DataResponse:
       type: object

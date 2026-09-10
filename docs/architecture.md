@@ -26,7 +26,7 @@ app.ts
 ├── identity/
 │   ├── ens.ts         ENSv2 Sepolia passport resolver (reads only)
 │   └── service.ts     ENS-first identity, fail closed under the parent name
-├── ai/provider.ts     interpret / explain / analyze; Anthropic or rule-based; grounding check
+├── ai/provider.ts     interpret / explain / analyze; OpenRouter or rule-based; grounding check
 ├── data/provider.ts   The Graph (Messari-standard documents, multi-protocol fan-out) or simulated
 ├── payment/x402.ts    x402 resource server, dynamic per-request price, pre-payment policy hook
 └── routes/data.ts     the only route that returns data
@@ -138,12 +138,15 @@ query that does not is fanned out to all of them and answered as
 
 ## AI
 
-`AnthropicAIProvider` uses `messages.parse` with a Zod output format for
-interpretation and `beta.messages.create` with server-side refusal fallbacks
-for explanation and analysis. `RuleBasedAIProvider` implements the same
-interface with no model. Both feed `groundAnalysis`, which strips any `0x` hex
-token in the summary that does not appear in the serialised data and records
-what it removed.
+`OpenRouterAIProvider` calls OpenRouter's chat completions endpoint.
+Interpretation asks for a strict JSON schema with `provider.require_parameters`,
+so only providers that honour the schema are used, and the result is checked
+with Zod before the rule-based validator sees it. Explanation and analysis are
+plain completions. Any failure, including exhausted credits, a content-filter
+decline, invalid JSON or a timeout, falls back to `RuleBasedAIProvider`, which
+implements the same interface with no model. Both feed `groundAnalysis`, which
+strips any `0x` hex token in the summary that does not appear in the serialised
+data and records what it removed.
 
 ## The dashboard
 

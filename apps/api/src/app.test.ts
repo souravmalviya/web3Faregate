@@ -37,7 +37,7 @@ function simulatedConfig(): AppConfig {
       reason: 'test',
     },
     data: { mode: 'simulated', graphApiKey: undefined, subgraphs: undefined, reason: 'test' },
-    ai: { mode: 'simulated', apiKey: undefined, model: 'claude-opus-5', reason: 'test' },
+    ai: { mode: 'simulated', apiKey: undefined, model: 'openai/gpt-4.1-mini', reason: 'test' },
     ens: {
       mode: 'simulated',
       rpcUrl: undefined,

@@ -18,8 +18,6 @@
  * with no API key at all, and the gateway reports which one is in use.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod/v4';
 
 import {
@@ -50,7 +48,7 @@ export interface AnalysisResult {
 }
 
 export interface AIProvider {
-  readonly name: 'anthropic' | 'rule-based';
+  readonly name: 'openrouter' | 'rule-based';
   describe(): string;
   interpret(prompt: string): Promise<InterpretResult>;
   explain(decision: PolicyDecision, query: ResourceQuery | null, agent: Agent | null): Promise<string>;
@@ -145,14 +143,34 @@ function summariseShape(data: unknown): string {
   return parts.length > 0 ? `${parts.join(', ')}.` : 'a single record.';
 }
 
-// --- Anthropic -----------------------------------------------------------
+// --- OpenRouter ----------------------------------------------------------
+
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const InterpretationSchema = z.object({
   resource: z.enum(RESOURCE_KINDS),
-  address: z.string().describe('The 0x-prefixed EVM address the request is about.'),
+  address: z.string(),
   lookbackDays: z.number().int().min(1).max(365),
-  rationale: z.string().describe('One sentence on why this resource and window were chosen.'),
+  rationale: z.string(),
 });
+
+/**
+ * InterpretationSchema as the JSON Schema OpenRouter enforces. Numeric bounds
+ * are left to the Zod check and the rule-based validator rather than written
+ * into the schema, because strict structured outputs do not accept every JSON
+ * Schema keyword on every model.
+ */
+const INTERPRETATION_JSON_SCHEMA = {
+  type: 'object',
+  properties: {
+    resource: { type: 'string', enum: [...RESOURCE_KINDS] },
+    address: { type: 'string', description: 'The 0x-prefixed EVM address the request is about.' },
+    lookbackDays: { type: 'integer', description: 'Time window in days, from 1 to 365.' },
+    rationale: { type: 'string', description: 'One sentence on why this resource and window were chosen.' },
+  },
+  required: ['resource', 'address', 'lookbackDays', 'rationale'],
+  additionalProperties: false,
+};
 
 const INTERPRET_SYSTEM = `You translate a request from an AI agent into one structured onchain data query for a metered gateway.
 
@@ -165,47 +183,118 @@ Rules:
 - lookbackDays is the time window in days. "recent" or unspecified means 30. Never exceed 365.
 - Do not invent parameters the request did not ask for.`;
 
+const EXPLAIN_SYSTEM =
+  'Rewrite the following policy decision as two or three plain sentences for the human who owns this agent. Keep every number and every reason. Add nothing.';
+
 const ANALYZE_SYSTEM = `You summarise onchain data that a metered gateway has already retrieved for an AI agent.
 
 The JSON you are given is the only source of truth. Every number, address, transaction hash and symbol you mention must appear in it verbatim. If the data is empty or thin, say so. Do not speculate about values that are not present, and do not describe the data as real if it is marked simulated.
 
 Write three to six sentences of plain prose for a treasury analyst. No headings, no bullet points.`;
 
-export interface AnthropicProviderOptions {
-  apiKey: string;
-  model: string;
+interface ChatCompletionResponse {
+  choices?: Array<{ finish_reason?: string | null; message?: { content?: string | null } }>;
+  error?: { code?: number; message?: string };
 }
 
-export class AnthropicAIProvider implements AIProvider {
-  readonly name = 'anthropic' as const;
-  private readonly client: Anthropic;
+/** A failed OpenRouter call. `status` is 0 when the request never got an HTTP answer. */
+export class OpenRouterError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'OpenRouterError';
+    this.status = status;
+  }
+}
+
+export interface OpenRouterProviderOptions {
+  apiKey: string;
+  model: string;
+  /** Injected for tests. */
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}
+
+export class OpenRouterAIProvider implements AIProvider {
+  readonly name = 'openrouter' as const;
+  private readonly apiKey: string;
   private readonly model: string;
+  private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
   private readonly fallback = new RuleBasedAIProvider();
 
-  constructor(options: AnthropicProviderOptions) {
-    this.client = new Anthropic({ apiKey: options.apiKey });
+  constructor(options: OpenRouterProviderOptions) {
+    this.apiKey = options.apiKey;
     this.model = options.model;
+    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 45_000;
   }
 
   describe(): string {
-    return `Anthropic ${this.model}. Proposals are re-validated and analyses are grounding-checked.`;
+    return `OpenRouter ${this.model}. Proposals are re-validated and analyses are grounding-checked.`;
+  }
+
+  /** One chat completion. Resolves to the message text or throws OpenRouterError. */
+  private async complete(body: Record<string, unknown>): Promise<string> {
+    let response: Response;
+    try {
+      response = await this.fetchImpl(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${this.apiKey}`,
+          'content-type': 'application/json',
+          // OpenRouter app attribution. Optional, and carries no request data.
+          'HTTP-Referer': 'https://github.com/souravmalviya/web3Faregate',
+          'X-OpenRouter-Title': 'Faregate',
+        },
+        body: JSON.stringify({ model: this.model, ...body }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (error) {
+      throw new OpenRouterError(0, error instanceof Error ? error.name : 'network error');
+    }
+
+    const payload = (await response.json().catch(() => null)) as ChatCompletionResponse | null;
+    if (!response.ok || !payload || payload.error) {
+      throw new OpenRouterError(
+        payload?.error?.code ?? response.status,
+        payload?.error?.message ?? `HTTP ${response.status}`,
+      );
+    }
+    const choice = payload.choices?.[0];
+    if (choice?.finish_reason === 'content_filter') {
+      throw new OpenRouterError(response.status, 'declined by a content filter');
+    }
+    const text = choice?.message?.content;
+    if (typeof text !== 'string' || text.trim() === '') {
+      throw new OpenRouterError(response.status, 'empty completion');
+    }
+    return text.trim();
   }
 
   async interpret(prompt: string): Promise<InterpretResult> {
     try {
-      const response = await this.client.messages.parse({
-        model: this.model,
-        max_tokens: 1024,
-        system: INTERPRET_SYSTEM,
-        messages: [{ role: 'user', content: prompt }],
-        output_config: { format: zodOutputFormat(InterpretationSchema) },
+      const content = await this.complete({
+        messages: [
+          { role: 'system', content: INTERPRET_SYSTEM },
+          { role: 'user', content: prompt },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'faregate_query', strict: true, schema: INTERPRETATION_JSON_SCHEMA },
+        },
+        // Route only to providers that honour the schema, so a model that would
+        // ignore it is never chosen silently.
+        provider: { require_parameters: true },
+        max_tokens: 400,
+        temperature: 0,
       });
 
-      if (response.stop_reason === 'refusal' || !response.parsed_output) {
-        return this.fallback.interpret(prompt);
-      }
+      const parsed = InterpretationSchema.safeParse(JSON.parse(content));
+      if (!parsed.success) return this.fallback.interpret(prompt);
 
-      const { rationale, ...proposal } = response.parsed_output;
+      const { rationale, ...proposal } = parsed.data;
       return { proposal, rationale, provider: this.name };
     } catch (error) {
       logModelError('interpret', error);
@@ -216,22 +305,14 @@ export class AnthropicAIProvider implements AIProvider {
   async explain(decision: PolicyDecision, query: ResourceQuery | null, agent: Agent | null): Promise<string> {
     const facts = await this.fallback.explain(decision, query, agent);
     try {
-      const response = await this.client.beta.messages.create({
-        model: this.model,
-        max_tokens: 1024,
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
-        system:
-          'Rewrite the following policy decision as two or three plain sentences for the human who owns this agent. Keep every number and every reason. Add nothing.',
-        messages: [{ role: 'user', content: facts }],
+      return await this.complete({
+        messages: [
+          { role: 'system', content: EXPLAIN_SYSTEM },
+          { role: 'user', content: facts },
+        ],
+        max_tokens: 300,
+        temperature: 0,
       });
-      if (response.stop_reason === 'refusal') return facts;
-      const text = response.content
-        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-        .map((block) => block.text)
-        .join('')
-        .trim();
-      return text.length > 0 ? text : facts;
     } catch (error) {
       logModelError('explain', error);
       return facts;
@@ -258,25 +339,14 @@ export class AnthropicAIProvider implements AIProvider {
     ].join('\n');
 
     try {
-      const response = await this.client.beta.messages.create({
-        model: this.model,
-        max_tokens: 2048,
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
-        system: ANALYZE_SYSTEM,
-        messages: [{ role: 'user', content: framing }],
+      const raw = await this.complete({
+        messages: [
+          { role: 'system', content: ANALYZE_SYSTEM },
+          { role: 'user', content: framing },
+        ],
+        max_tokens: 600,
+        temperature: 0,
       });
-
-      if (response.stop_reason === 'refusal') {
-        return this.fallback.analyze(query, data, provenance);
-      }
-
-      const raw = response.content
-        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-        .map((block) => block.text)
-        .join('')
-        .trim();
-
       const grounded = groundAnalysis(raw, data);
       return { text: grounded.text, provider: this.name, groundingWarnings: grounded.warnings };
     } catch (error) {
@@ -287,19 +357,19 @@ export class AnthropicAIProvider implements AIProvider {
 }
 
 /**
- * Logs model failures by class so an operator can tell a bad key from a rate
- * limit from an outage. Never logs request content.
+ * Logs model failures by kind, so an operator can tell a bad key from empty
+ * credits from an outage. Never logs request or response content.
  */
 function logModelError(stage: string, error: unknown): void {
-  if (error instanceof Anthropic.AuthenticationError) {
-    console.error(`[faregate] ai ${stage}: authentication failed, check ANTHROPIC_API_KEY`);
-  } else if (error instanceof Anthropic.RateLimitError) {
-    console.error(`[faregate] ai ${stage}: rate limited, falling back to rule-based`);
-  } else if (error instanceof Anthropic.APIConnectionError) {
-    console.error(`[faregate] ai ${stage}: could not reach the API, falling back to rule-based`);
-  } else if (error instanceof Anthropic.APIError) {
-    console.error(`[faregate] ai ${stage}: API error ${error.status ?? ''} ${error.name}`);
-  } else {
-    console.error(`[faregate] ai ${stage}: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const status = error instanceof OpenRouterError ? error.status : undefined;
+  let reason: string;
+  if (status === 401) reason = 'authentication failed, check OPENROUTER_API_KEY';
+  else if (status === 402) reason = 'OpenRouter credits are exhausted';
+  else if (status === 429) reason = 'rate limited';
+  else if (status === 0) reason = `could not reach OpenRouter (${(error as Error).message})`;
+  else if (status !== undefined && status >= 500) reason = `OpenRouter or the upstream model failed (HTTP ${status})`;
+  else if (error instanceof OpenRouterError) reason = `request failed (HTTP ${status}): ${error.message}`;
+  else if (error instanceof SyntaxError) reason = 'the model returned invalid JSON';
+  else reason = error instanceof Error ? error.message : String(error);
+  console.error(`[faregate] ai ${stage}: ${reason}; using the rule-based fallback`);
 }

@@ -162,15 +162,21 @@ function loadData(): DataConfig {
   return { mode: 'live', graphApiKey, subgraphs };
 }
 
+/**
+ * Default OpenRouter model. It supports strict structured outputs and does not
+ * spend reasoning tokens, which keeps each Faregate request well under a cent.
+ */
+export const DEFAULT_AI_MODEL = 'openai/gpt-4.1-mini';
+
 function loadAi(): AiConfig {
-  const apiKey = str('ANTHROPIC_API_KEY');
-  const model = str('FAREGATE_AI_MODEL') ?? 'claude-opus-5';
+  const apiKey = str('OPENROUTER_API_KEY');
+  const model = str('OPENROUTER_MODEL') ?? DEFAULT_AI_MODEL;
   if (!apiKey) {
     return {
       mode: 'simulated',
       apiKey,
       model,
-      reason: 'ANTHROPIC_API_KEY is not set, so requests are parsed by the rule-based fallback.',
+      reason: 'OPENROUTER_API_KEY is not set, so requests are parsed by the rule-based fallback.',
     };
   }
   return { mode: 'live', apiKey, model };

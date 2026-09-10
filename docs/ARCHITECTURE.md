@@ -21,7 +21,9 @@ tests boot the real thing on an ephemeral port with a fixed clock.
 ```
 app.ts
 ├── config.ts          env → AppConfig; each subsystem is live or simulated with a reason
-├── store.ts           in-memory agents, policies, requests, spend ledger, nonces, audit log
+├── store.ts           agents, policies, requests, spend ledger, nonces, audit log; JSON snapshot on disk
+├── human-auth.ts      verifies wallet signatures on human actions (signer, validity window, digest, single use)
+├── rate-limit.ts      sliding-window limiter: per agent for requests, per caller for human actions
 ├── query-parser.ts    rule-based prompt → ResourceQuery; validator for untrusted structured queries
 ├── identity/
 │   ├── ens.ts         ENSv2 Sepolia passport resolver (reads only)
@@ -31,6 +33,23 @@ app.ts
 ├── payment/x402.ts    x402 resource server, dynamic per-request price, pre-payment policy hook
 └── routes/data.ts     the only route that returns data
 ```
+
+### Human actions
+
+```
+POST /agents                 create a passport with its capability
+PUT  /agents/:id/policy      replace a local passport's capability
+POST /agents/:id/revoke      the kill switch
+POST /requests/:id/approval  approve or reject a waiting request
+```
+
+Each carries `by`, `issuedAt` and `signature`. The message the wallet signed
+is rebuilt from `packages/shared/src/actions.ts` (the same function the
+dashboard used), the signer is recovered with viem's `verifyMessage`, and the
+action proceeds only if the signer is `by`, the message is under ten minutes
+old, the payload digest matches for policy and agent creation, and the
+signature has not been used before. `FAREGATE_REQUIRE_SIGNED_ACTIONS=false`
+accepts unsigned envelopes and records them as such.
 
 ### Request lifecycle
 
@@ -160,6 +179,23 @@ surfaces read as one product.
 A standalone Node process. It narrates each step because it is what runs
 during the demo. `--request <id>` makes it present a quote it already holds,
 which is how the revocation moment is shown.
+
+## Persistence
+
+`GatewayStore` keeps everything in memory and, when `FAREGATE_STATE_FILE` is
+set (the default is `data/faregate-state.json`), writes an atomic snapshot
+shortly after every change and on shutdown. A restart reloads it, so a
+revocation survives a restart. The demo passports are seeded only into an
+empty store. `npm run reset` deletes the snapshot.
+
+## Observability
+
+Every request has an id, and `GET /requests/:id/events` returns its own
+timeline in order: received, evaluated, approval requested, approved (by whom,
+signed or not), payment required, payment verified or rejected (with stage),
+data retrieved (with provenance), analysis completed (with grounding
+warnings), fulfilled or failed. The dashboard renders this under each request
+as "What happened".
 
 ## What is deliberately absent
 

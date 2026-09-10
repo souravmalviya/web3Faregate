@@ -40,15 +40,17 @@ Agent → Request → Policy → Human approval → Payment → Data → Analysi
   it was given; a fabricated hash never reaches the human.
 - **Revocation** is an onchain act by the owner. The gateway holds no key and
   cannot undo it.
+- **Every human action is wallet-signed** and verified server-side, so the
+  audit trail says who approved, who revoked and who changed what.
 
 ## 4. Architecture
 
-Three processes and one pure library. See `docs/architecture.md` for the full
+Three processes and one pure library. See `docs/ARCHITECTURE.md` for the full
 walk and `README.md` for the Mermaid diagram.
 
 | Piece | Role |
 |---|---|
-| `packages/shared` | Domain model, pricing, policy engine. No I/O. 27 tests. |
+| `packages/shared` | Domain model, pricing, policy engine, signed-action messages. No I/O. 32 tests. |
 | `apps/api` | The gateway. Identity → interpreter → policy → x402 gate → data → analysis → audit. |
 | `apps/web` | The human's dashboard. Same HTTP API as the agent; no privileged path. |
 | `apps/agent` | A real x402 client in its own process. Narrates each step for the demo. |
@@ -92,6 +94,8 @@ Threat: an autonomous, possibly compromised agent that can send anything to
 the gateway. Defences, each traceable to a file:
 
 - Deterministic server-side policy (`packages/shared/src/policy.ts`).
+- Wallet-signed human actions, verified server-side (`apps/api/src/human-auth.ts`).
+- Per-passport and per-caller rate limits (`apps/api/src/rate-limit.ts`).
 - Integer micro-USD; no float drift on limits (`pricing.ts`).
 - Prices from the stored request, never the caller (`payment/x402.ts`).
 - Policy re-evaluated at quote, payment and release; revocation refused at the
@@ -104,13 +108,14 @@ the gateway. Defences, each traceable to a file:
 - Identity fails closed when ENS is unreachable (`identity/service.ts`).
 - No custody, no keys, no transactions from the gateway.
 
-Limits are stated in `SECURITY.md`: in-memory state, unauthenticated human
-endpoints, no rate limiting.
+Limits are stated in `SECURITY.md`: single-machine snapshot persistence, and
+signatures prove who acted rather than who was entitled to.
 
 ## 8. Demo flow
 
-Scripted at 3:30 in `docs/demo-script.md`; runbook in `DEMO.md`.
+Scripted at 3:30 in `docs/DEMO_SCRIPT.md`; runbook in `DEMO.md`.
 
+0. Human creates `ResearchBot` from the dashboard, signing with their wallet.
 1. Agent asks for 30 days of wallet activity. Gateway interprets, prices at
    $0.036, stops for a human.
 2. Human reads the decision and the plain-language explanation, approves.
@@ -122,8 +127,8 @@ Scripted at 3:30 in `docs/demo-script.md`; runbook in `DEMO.md`.
 
 ## 9. Limitations
 
-- In-memory state; a restart resets local passports and requests.
-- Approvals are not signed.
+- State is a local snapshot file; one gateway, one machine.
+- Signatures prove who acted, not that they were entitled to.
 - Live x402 settlement and ENS minting are verified against the packages and
   docs, and in simulated mode end to end; running them live is the operator's
   step with funded testnet accounts.
@@ -168,6 +173,11 @@ owner's line waits.
 a pure engine, at quote, at payment and at release, against a ledger updated
 only on collection.
 
+**How do you know a human approved, and which one?** The approval carries an
+EIP-191 signature over a message naming the action and the request id. The
+gateway recovers the signer, checks it matches, and consumes the signature.
+The audit trail records `signed: true` and the address.
+
 **How do you verify payment?** The x402 facilitator verifies the signed
 Hedera transfer before the handler runs and settles it after; the receipt
 records the transaction id. In simulated mode the receipt says `simulated`.
@@ -209,7 +219,7 @@ Data fails loudly. Payment cannot be verified, so no data is released.
 
 ## 13. Three-minute pitch
 
-See `docs/demo-script.md`. The spine: the problem in one breath, the
+See `docs/DEMO_SCRIPT.md`. The spine: the problem in one breath, the
 capability on screen, the agent asking and being stopped, the human deciding,
 the payment in atomic USDC, the grounded analysis, and the revocation that
 turns away an agent holding a valid quote.
@@ -228,6 +238,7 @@ holding an approved quote.
 Read in this order:
 
 1. `packages/shared/src/policy.ts`, then its tests. This is the authority.
+1. `apps/api/src/human-auth.ts` and `packages/shared/src/actions.ts`. Who acted.
 2. `apps/api/src/payment/x402.ts`. The three `reevaluate` calls and why the
    hook runs before the price.
 3. `apps/api/src/routes/data.ts`. Spend before serve; fail loudly; analysis

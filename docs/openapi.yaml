@@ -59,6 +59,39 @@ paths:
                     items:
                       $ref: '#/components/schemas/AgentWithPolicy'
 
+  /agents:
+    post:
+      tags: [human]
+      summary: Create a local passport with its capability.
+      description: |
+        Signed by the human, who becomes the passport's owner. The name is
+        derived from the label under the gateway's parent name unless `id` is
+        given. The signature covers `{ id, label, policy }`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ActionEnvelope'
+                - type: object
+                  required: [label, policy]
+                  properties:
+                    label: { type: string, minLength: 2, maxLength: 60 }
+                    id: { type: string, description: 'Optional explicit passport name.' }
+                    policy: { $ref: '#/components/schemas/PolicyInput' }
+      responses:
+        '201':
+          description: Created.
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/SignatureError'
+        '409':
+          description: A passport with that name already exists.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /agents/{id}:
     get:
       tags: [human]
@@ -75,6 +108,7 @@ paths:
     put:
       tags: [human]
       summary: Replace the capability attached to a local passport.
+      description: Signed. The signature covers the five policy fields.
       parameters:
         - $ref: '#/components/parameters/AgentId'
       requestBody:
@@ -82,14 +116,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PolicyInput'
+              allOf:
+                - $ref: '#/components/schemas/PolicyInput'
+                - $ref: '#/components/schemas/ActionEnvelope'
       responses:
         '200':
           description: OK
         '400':
           $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/SignatureError'
         '404':
           $ref: '#/components/responses/Error'
+        '409':
+          description: The passport is managed onchain.
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /agents/{id}/revoke:
     post:
@@ -101,13 +143,23 @@ paths:
         `faregate.status` text record to `revoked` or unregister the subname.
       parameters:
         - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionEnvelope'
       responses:
         '200':
           description: Revoked.
+        '401':
+          $ref: '#/components/responses/SignatureError'
         '404':
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /requests:
     post:
@@ -182,10 +234,23 @@ paths:
                   explanation: { type: string }
                   provider: { type: string, enum: [openrouter, rule-based] }
 
+  /requests/{id}/events:
+    get:
+      tags: [human]
+      summary: The request's own timeline, oldest first.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: OK
+        '404':
+          $ref: '#/components/responses/Error'
+
   /requests/{id}/approval:
     post:
       tags: [human]
       summary: Approve or reject a request that is waiting on a human.
+      description: Signed. The message names the action (approve or reject) and the request id.
       parameters:
         - $ref: '#/components/parameters/RequestId'
       requestBody:
@@ -193,17 +258,22 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [decision, by]
-              properties:
-                decision: { type: string, enum: [approved, rejected] }
-                by: { $ref: '#/components/schemas/Address' }
-                note: { type: string, maxLength: 500 }
+              allOf:
+                - $ref: '#/components/schemas/ActionEnvelope'
+                - type: object
+                  required: [decision]
+                  properties:
+                    decision: { type: string, enum: [approved, rejected] }
+                    note: { type: string, maxLength: 500 }
       responses:
         '200':
           description: OK
+        '401':
+          $ref: '#/components/responses/SignatureError'
         '409':
           description: The request is not awaiting approval.
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /data/{id}:
     get:
@@ -225,7 +295,10 @@ paths:
         '402':
           description: Payment required. Body and `PAYMENT-REQUIRED` header carry x402 requirements.
         '403':
-          description: Refused at the gate. Not authorised, revoked, over budget, or already fulfilled.
+          description: |
+            Refused at the gate: not authorised, revoked, over budget, or already
+            fulfilled. From the gateway itself the body is `{ error: { code, message } }`;
+            from the x402 middleware in live payment mode it is `{ error: "message" }`.
         '502':
           description: Payment was taken but the data provider failed. The request is marked failed.
 
@@ -256,6 +329,23 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    SignatureError:
+      description: |
+        The action was not signed (`signature_required`), the signature does
+        not match the acting wallet for this exact action (`bad_signature`),
+        or it is older than ten minutes (`signature_expired`).
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code: { type: string, enum: [signature_required, bad_signature, signature_expired] }
+                  message: { type: string }
+    RateLimited:
+      description: Too many requests. `Retry-After` carries the wait in seconds.
     Error:
       description: Structured error.
       content:
@@ -273,6 +363,19 @@ components:
     Address:
       type: string
       pattern: '^0x[a-fA-F0-9]{40}$'
+
+    ActionEnvelope:
+      type: object
+      description: |
+        Who acted, and the proof. The wallet signs the text produced by
+        `buildActionMessage` in `packages/shared`; the gateway rebuilds it and
+        recovers the signer. When `FAREGATE_REQUIRE_SIGNED_ACTIONS=false`,
+        `issuedAt` and `signature` may be omitted and the action is recorded as unsigned.
+      required: [by]
+      properties:
+        by: { $ref: '#/components/schemas/Address' }
+        issuedAt: { type: string, format: date-time }
+        signature: { type: string, pattern: '^0x[0-9a-fA-F]{130}$' }
 
     ResourceKind:
       type: string
@@ -419,6 +522,7 @@ components:
             decision: { type: string, enum: [approved, rejected] }
             by: { $ref: '#/components/schemas/Address' }
             at: { type: string, format: date-time }
+            signed: { type: boolean, description: True when a wallet signature from `by` was verified. }
             note: { type: string }
         payment: { $ref: '#/components/schemas/PaymentReceipt' }
         result: { $ref: '#/components/schemas/RequestResult' }
@@ -457,6 +561,9 @@ components:
         service: { type: string }
         time: { type: string, format: date-time }
         network: { type: string }
+        parentName: { type: string, description: Parent name new passports are created under. }
+        signedActions: { type: boolean }
+        persistence: { type: string }
         modes:
           type: object
           properties:

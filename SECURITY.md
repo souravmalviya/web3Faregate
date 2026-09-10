@@ -62,6 +62,17 @@ unsupported resource kinds.
 against that data. A transaction hash or address that does not appear in the
 data is replaced with a visible marker and recorded, never shown as fact.
 
+**Human actions are signed.** Approve, reject, revoke, set-policy and
+create-agent carry an EIP-191 signature over a short readable message built in
+`packages/shared/src/actions.ts`. `apps/api/src/human-auth.ts` recovers the
+signer and accepts the action only if the signer is the claimed wallet, the
+message is under ten minutes old, the payload digest matches for actions that
+carry one, and the signature has not been used before. The audit trail records
+`signed: true` on verified actions.
+
+**Rate limiting.** `apps/api/src/rate-limit.ts` limits request submissions per
+passport and human actions per caller, answering 429 with `Retry-After`.
+
 **Fail closed on identity.** When ENS is configured, a passport under the
 parent name that cannot be resolved because the chain is unreachable is treated
 as unknown and denied. A stale local copy is never consulted for it.
@@ -73,17 +84,18 @@ provider that fails, fails; it never falls back to simulated data.
 ## What it does not do
 
 - **No custody.** The gateway holds no user funds and never sends a
-  transaction. The agent pays with its own wallet; the human signs nothing.
+  transaction. The agent pays with its own wallet; the human signs messages,
+  never transactions.
 - **No keys in the gateway.** The only private key anywhere in the system is
   the demo agent's throwaway testnet key, read from `.env` by the agent
   process. The gateway never sees it.
-- **No persistence.** State is in memory. A restart forgets requests, spend
-  and revocations of local passports. ENS passports are unaffected because the
-  chain is the record.
-- **No authentication on the human endpoints.** Approvals carry a wallet
-  address but no signature. In a production build the dashboard would sign
-  approvals and the gateway would verify them.
-- **Rate limiting** is not implemented.
+- **Persistence is a local snapshot file.** Fine for one gateway on one
+  machine; not a shared or replicated store.
+- **Signatures prove who acted, not that they were entitled to.** Any wallet
+  can create an agent or approve a request; there is no owner check tying an
+  agent to the wallet that created it. Adding one is a policy field away.
+- **Unsigned mode exists.** `FAREGATE_REQUIRE_SIGNED_ACTIONS=false` accepts
+  unsigned actions and records them as unsigned. It is for local experiments.
 
 ## Secrets
 

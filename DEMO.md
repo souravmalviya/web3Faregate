@@ -6,9 +6,10 @@ should see at each step, and what to do when you do not.
 ## Prerequisites
 
 - Node 20 or newer. Built on Node 24.
-- A browser with an injected wallet (MetaMask or similar) on **Sepolia**, for
-  approving in the dashboard. Approvals record the wallet's address; no
-  transaction is sent and no funds are needed.
+- A browser with an injected wallet (MetaMask or similar) on **Sepolia**. Every
+  human action (creating an agent, approving, revoking, changing a policy) is
+  signed by the wallet and verified by the gateway. Signing sends no
+  transaction and needs no funds.
 - Nothing else. Every external subsystem is optional and simulates itself.
 
 ## Network and assets
@@ -64,6 +65,13 @@ two passports: **Treasury Research Agent** and **Trial Scout Agent**.
 
 ## The flow
 
+### 0. Create an agent (optional)
+
+Dashboard: **New agent**, keep the defaults (`ResearchBot`, $0.10 per query,
+approval above $0.02, $1.00 daily), **Create and sign**, sign in the wallet.
+The card appears as `researchbot.agents.faregate.eth`. The two seeded
+passports work too.
+
 ### 1. An agent asks
 
 ```bash
@@ -84,7 +92,8 @@ then waits, printing the curl command that would approve it.
 ### 2. A human approves
 
 Dashboard: the request appears at the top with **Awaiting approval** and the
-policy reason. Connect the wallet if not already, then **Approve**.
+policy reason. Connect the wallet if not already, then **Approve** and sign
+the message the wallet shows.
 
 Expected in the agent terminal within two seconds:
 
@@ -98,8 +107,8 @@ payment       simulated receipt                  (or: a Hedera transaction id)
 
 ### 3. Revoke and retry
 
-Dashboard: **Revoke** on the research agent, then **Confirm revoke**. The pill
-turns red.
+Dashboard: **Revoke** on the research agent, then **Confirm revoke**, and sign.
+The card turns red with *Access revoked*.
 
 ```bash
 npm run agent
@@ -122,12 +131,20 @@ Expected:
 ```
 
 The dashboard row shows **Refused at the gate** under its status, and the audit
-trail reads `request.approved` → `agent.revoked` → `payment.rejected`.
+trail reads `request.approved` → `agent.revoked` → `payment.rejected`. A new
+request from the revoked agent shows **Access denied · agent revoked**.
 
 ### 4. Reset
 
-Restart the gateway. State is in memory, so both passports are active again
-and the queue is empty.
+State is a snapshot file, so a restart keeps everything, including the
+revocation. To start clean:
+
+```bash
+npm run reset      # deletes data/faregate-state.json
+```
+
+then restart the gateway; it seeds the two demo passports into the empty
+store.
 
 ## Troubleshooting
 
@@ -135,6 +152,10 @@ and the queue is empty.
 |---|---|---|
 | Dashboard says "gateway unreachable" | Gateway not running or on another port | `npm run dev:api`; check `PORT` in `.env` matches `NEXT_PUBLIC_FAREGATE_GATEWAY_URL` |
 | Approve button is disabled | No wallet connected, or wrong chain | Connect; switch to Sepolia when prompted |
+| "Signature declined in the wallet" | You cancelled the wallet prompt | Nothing changed; act again and sign |
+| `401 signature_required` from the API | Signed actions are on and the call had no signature | Use the dashboard, or set `FAREGATE_REQUIRE_SIGNED_ACTIONS=false` for API experiments |
+| `429 rate_limited` | An agent submitted too fast | Wait for the `Retry-After` seconds, or raise `FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE` |
+| Restart did not reset the demo | State persists in `data/faregate-state.json` | `npm run reset`, then restart |
 | Agent prints `Gateway is not reachable` | Same as above | Set `FAREGATE_GATEWAY_URL` if the gateway is not on `:8402` |
 | Agent waits forever | Nobody approved | Approve in the dashboard, or run the printed curl |
 | `payment: simulated` although `FAREGATE_PAY_TO` is set | `.env` not at the repo root | The gateway loads `.env` from the repository root only |

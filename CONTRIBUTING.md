@@ -26,10 +26,13 @@ Fill in `.env` to turn subsystems live one at a time.
 ```bash
 npm run typecheck
 npm test
+npm run lint
 npm run build
 ```
 
-All three must pass before a commit. Tests run directly on the TypeScript
+All four must pass before a commit; `npm run check` runs them together. Lint
+covers the dashboard (ESLint with the Next.js rules); the gateway and the
+shared package are held to `tsc --strict`. Tests run directly on the TypeScript
 sources under Node's type stripping, which is why source files carry `.ts`
 import specifiers and why constructor parameter properties, enums and
 decorators are not used.

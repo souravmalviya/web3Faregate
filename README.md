@@ -114,7 +114,8 @@ apps/web        the dashboard (Next.js)
 apps/agent      the demo agent, a real x402 client in its own process
 packages/shared domain model, pricing, policy engine (pure, tested)
 scripts/ens     mint and revoke ENS passports with the owner's wallet
-docs/           sponsor matrix, demo script, architecture, ENS guide, OpenAPI
+scripts/hedera  create the gateway account, check and associate USDC
+docs/           ARCHITECTURE, DECISIONS, DEMO_SCRIPT, SECURITY, SPONSOR_MATRIX, bounty evidence, ENS guide, OpenAPI
 ```
 
 ## Sponsor integrations
@@ -145,9 +146,14 @@ per-bounty breakdown with file references and honest status is in
   clamped before the policy engine sees it.
 - Model summaries are grounding-checked: a hash or address not present in the
   data is replaced with a visible marker and logged.
+- Every human action (approve, reject, revoke, set policy, create agent) is
+  signed by the acting wallet and verified by the gateway: signer must match,
+  ten-minute validity, payload digest, single use.
+- Agents are rate-limited per passport; humans per caller.
 - No custody, no keys in the gateway, no transaction ever sent by the gateway.
 
-Threat model and limits: [SECURITY.md](SECURITY.md).
+Threat model and limits: [SECURITY.md](SECURITY.md). Why it is built this way:
+[docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Setup
 
@@ -177,9 +183,46 @@ Turn subsystems live one at a time in `.env`:
 
 `GET /health` tells you what is live.
 
+### Every environment variable
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8402` | Gateway port |
+| `FAREGATE_CORS_ORIGIN` | `http://localhost:3000` | Dashboard origin |
+| `FAREGATE_REQUIRE_SIGNED_ACTIONS` | `true` | Human actions must carry a verified wallet signature |
+| `FAREGATE_STATE_FILE` | `data/faregate-state.json` | Snapshot file; `off` for memory only |
+| `FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Submissions per agent per minute |
+| `FAREGATE_RATE_LIMIT_ACTIONS_PER_MINUTE` | `30` | Human actions per caller per minute |
+| `FAREGATE_NETWORK` | `hedera:testnet` | CAIP-2 network for pricing and settlement |
+| `X402_FACILITATOR_URL` | Blocky402 host for the network | x402 facilitator |
+| `FAREGATE_PAY_TO` | unset (payments simulated) | Hedera account that receives fares |
+| `FAREGATE_PAY_TO_PRIVATE_KEY` | unset | Read only by `scripts/hedera/*`, never by the gateway |
+| `FAREGATE_ASSET` | `0.0.429274` (testnet USDC) | HTS token to charge in |
+| `FAREGATE_PAYMENT_TIMEOUT_SECONDS` | `120` | How long a quote stays valid |
+| `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` | unset | The demo agent's paying account (agent process only) |
+| `GRAPH_API_KEY` | unset (data simulated) | Subgraph Studio key |
+| `GRAPH_SUBGRAPHS` | Aave v3, Compound v3, Spark on Ethereum | `protocol=subgraphId` pairs on the Messari standard schema |
+| `OPENROUTER_API_KEY` | unset (AI rule-based) | OpenRouter key |
+| `OPENROUTER_MODEL` | `openai/gpt-4.1-mini` | Any OpenRouter model with structured outputs |
+| `ENS_RPC_URL` | unset (passports local) | Sepolia RPC for ENSv2 resolution |
+| `FAREGATE_PARENT_NAME` | `agents.faregate.eth` | Parent name passports live under |
+| `ENS_UNIVERSAL_RESOLVER` | ENSv2 beta address | Override only if ENS redeploys |
+| `ENS_OWNER_PRIVATE_KEY` | unset | Read only by `scripts/ens/passport.ts` |
+| `NEXT_PUBLIC_FAREGATE_GATEWAY_URL` | `http://localhost:8402` | Where the dashboard finds the gateway |
+
+### Networks
+
+| Subsystem | Network | Asset or contract |
+|---|---|---|
+| Payment | Hedera testnet (`hedera:testnet`) | USDC `0.0.429274`, settled by Blocky402 |
+| Identity | Ethereum Sepolia | ENSv2 beta, `UniversalResolverV2` |
+| Data | The Graph gateway | Messari-standard subgraphs for Aave v3, Compound v3, Spark |
+
+Never point a demo at mainnet.
+
 ## Demo
 
-The demo is scripted in [docs/demo-script.md](docs/demo-script.md) and the
+The demo is scripted in [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) and the
 runbook is [DEMO.md](DEMO.md). The short version:
 
 ```bash
@@ -198,9 +241,11 @@ npm run agent -- --agent research.agents.faregate.eth --request <id>
 ## Tests
 
 ```bash
-npm test          # 88 tests: policy engine, pricing, store, AI grounding, data fan-out, HTTP surface
+npm test          # 113 tests: policy engine, pricing, signed actions, store persistence, rate limiting, AI grounding, data fan-out, HTTP surface
 npm run typecheck
+npm run lint      # ESLint on the dashboard
 npm run build
+npm run check     # all of the above in one go
 ```
 
 The HTTP suite boots the real app on an ephemeral port and covers the full
@@ -212,10 +257,11 @@ revocation before and after approval, and the audit trail order.
 
 Honest ones.
 
-- State is in memory. A gateway restart forgets requests, spend and local
-  revocations. ENS passports are unaffected because the chain is the record.
-- Human endpoints are not authenticated. Approvals carry a wallet address but
-  no signature.
+- State is a local snapshot file: one gateway, one machine. ENS passports are
+  unaffected because the chain is the record.
+- Signatures prove who acted, not that they were entitled to. Any wallet can
+  approve any request; tying an agent to the wallet that created it is a
+  policy field away.
 - The Graph documents target the Messari lending schema; a subgraph that does
   not publish it returns `schema_mismatch` rather than data.
 - ENSv2 is beta on Sepolia. The passport script dry-runs by default and cites
@@ -227,8 +273,7 @@ Honest ones.
 
 ## Future work
 
-- Signed approvals: the dashboard signs, the gateway verifies, a policy change
-  is itself an authorised act.
+- Owner binding: only the wallet that created an agent may approve for it.
 - HCS audit anchoring: write each settled payment to a Hedera Consensus Service
   topic so the audit trail is verifiable off the gateway.
 - Persisted state and multi-tenant passports.

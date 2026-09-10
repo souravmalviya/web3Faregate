@@ -1,8 +1,7 @@
 # Sponsor matrix
 
-Every sponsor integration in Faregate is listed here with its status, in the
-statuses ETHGlobal judges can verify. Nothing is marked further along than the
-evidence supports.
+Every sponsor integration in Faregate, in the statuses ETHGlobal judges can
+verify. Nothing is marked further along than the evidence supports.
 
 Statuses: `NOT PURSUED`, `TARGET`, `IMPLEMENTED`, `TESTED`, `DEMONSTRATED`,
 `SUBMISSION READY`.
@@ -10,6 +9,17 @@ Statuses: `NOT PURSUED`, `TARGET`, `IMPLEMENTED`, `TESTED`, `DEMONSTRATED`,
 A bounty is never marked "won". The most this document says is that Faregate
 is designed to satisfy the published requirements, and it points at the code
 and the evidence so a judge can check.
+
+## Summary
+
+| Sponsor | Bounty | Requirement | Faregate feature | Actual implementation | Tested | Demo evidence | Status |
+|---|---:|---|---|---|---|---|---|
+| Hedera | $6,000 | Live x402-gated service on Hedera settled via Blocky402; an agent completes a real paid request; README; video of 5 min or less | `GET /data/:id` is x402-gated, priced per query in USDC; `apps/agent` pays | `@x402/core`, `@x402/express`, `@x402/hedera` v2.25; gateway account `0.0.10457565`; facilitator `api.testnet.blocky402.com` checked at startup | Gate, policy re-check, spend ledger, replay: `apps/api/src/app.test.ts` | Live `402` with `PAYMENT-REQUIRED` verified 2026-09-10; settlement pending faucet USDC for the agent account | IMPLEMENTED, TESTED |
+| The Graph | $5,000 | Graph as load-bearing data; live Studio data; meaningful reasoning or NL interface; open source; video 2 to 4 min; Start Fresh pool | Sole data source; NL interpretation; grounded analysis | `apps/api/src/data/provider.ts`, `apps/api/src/ai/provider.ts`; Bearer-auth gateway queries | Grounding and provider tests | Live run 2026-09-10: NL ask, OpenRouter interpretation, Graph data from Aave, Compound and Spark, grounded summary | DEMONSTRATED |
+| The Graph | $5,000 | Standardized subgraphs: one query across many protocols; show what the standard made easier | Messari-standard documents, multi-protocol fan-out | `GRAPH_SUBGRAPHS` targets; `GraphDataProvider.fetch` fan-out keyed by protocol | 10 fan-out tests including schema conformance to Messari lending 3.1.0 | All five documents live against three protocols with no schema errors, 2026-09-10 | DEMONSTRATED |
+| ENS | $4,500 | Built on ENSv2 Sepolia; central; functional, nothing hardcoded; video or live demo | Passports as ENSv2 subnames; capability in text records; live resolution; onchain revocation; fail closed | `apps/api/src/identity/*`, `scripts/ens/passport.ts` | Resolver typechecked against viem; identity service behaviour covered through the app tests | Needs a funded Sepolia wallet to mint passports | IMPLEMENTED |
+| Bazantic | $2,000 | Create a gateway and recipe on bazantic.com for the project's API | The gateway is a small documented x402 API | `docs/openapi.yaml` | n/a | Operator work on bazantic.com | TARGET |
+| World, Privy, Arc, Ledger, 1inch, Uniswap, Chainlink | | | | | | | NOT PURSUED |
 
 ---
 

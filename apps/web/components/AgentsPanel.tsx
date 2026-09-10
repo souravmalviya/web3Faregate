@@ -17,6 +17,7 @@ import { Button, Empty, Kv, Pill, Section } from './ui';
 export function AgentsPanel({
   agents,
   parentName,
+  ensLive,
   canAct,
   onCreate,
   onRevoke,
@@ -25,6 +26,8 @@ export function AgentsPanel({
 }: {
   agents: AgentWithPolicy[];
   parentName: string;
+  /** When ENS is live, passports under the parent are created onchain, not here. */
+  ensLive: boolean;
   canAct: boolean;
   onCreate: (input: CreateAgentInput) => Promise<void>;
   onRevoke: (id: string) => Promise<void>;
@@ -38,17 +41,23 @@ export function AgentsPanel({
       eyebrow="Agent access"
       title="Passports"
       aside={
-        <Button
-          variant={creating ? 'quiet' : 'primary'}
-          onClick={() => setCreating((v) => !v)}
-          disabled={!canAct && !creating}
-          title={canAct ? undefined : 'Connect a wallet on Sepolia to create an agent'}
-        >
-          {creating ? 'Close' : 'New agent'}
-        </Button>
+        ensLive ? (
+          <span className="max-w-[280px] text-right text-[12.5px] text-muted">
+            Passports are ENS names on Sepolia. Their limits live in the name&apos;s records.
+          </span>
+        ) : (
+          <Button
+            variant={creating ? 'quiet' : 'primary'}
+            onClick={() => setCreating((v) => !v)}
+            disabled={!canAct && !creating}
+            title={canAct ? undefined : 'Connect a wallet on Sepolia to create an agent'}
+          >
+            {creating ? 'Close' : 'New agent'}
+          </Button>
+        )
       }
     >
-      {creating ? (
+      {creating && !ensLive ? (
         <CreateAgentForm
           parentName={parentName}
           existingIds={agents.map((a) => a.id)}
@@ -214,7 +223,10 @@ function AgentCard({
 
         <div className="flex items-center gap-2">
           {onchain ? (
-            <span className="text-[12.5px] text-muted" title="This passport lives onchain. Change it with the owner wallet.">
+            <span
+              className="text-[12.5px] text-muted"
+              title={`This passport lives onchain. Revoke it from a terminal: npm run ens:revoke -- ${agent.id}`}
+            >
               managed onchain
             </span>
           ) : (

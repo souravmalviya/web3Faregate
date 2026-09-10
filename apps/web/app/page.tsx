@@ -209,6 +209,7 @@ export default function Dashboard() {
           <AgentsPanel
             agents={agents}
             parentName={parentName}
+            ensLive={health?.modes.ens === 'live'}
             canAct={canAct}
             busy={busy}
             onCreate={(input: CreateAgentInput) =>

@@ -57,6 +57,18 @@ const identity: IdentityService =
       )
     : new LocalIdentityService(store);
 
+// The dashboard lists the store's display copies. With ENS live, refresh them
+// from the chain before serving, so an onchain passport shows as one from the
+// first page load. Decisions never read these copies; every request resolves
+// live.
+let ensPassports = 0;
+if (identity.mode === 'ens') {
+  for (const agent of store.listAgents()) {
+    const resolved = await identity.resolve(agent.id);
+    if (resolved.source === 'ens') ensPassports += 1;
+  }
+}
+
 // In live payment mode, confirm the facilitator can settle on this network
 // before accepting a single request. Starting anyway would leave /health
 // reporting payments as live while every paid request failed.
@@ -120,6 +132,9 @@ function start(): void {
     console.log(`[faregate] data     ${dataProvider.describe()}`);
     console.log(`[faregate] ai       ${aiProvider.describe()}`);
     console.log(`[faregate] identity ${identity.describe()}`);
+    if (identity.mode === 'ens') {
+      console.log(`[faregate] identity ${ensPassports} passport(s) read from ENS at startup`);
+    }
     console.log(
       `[faregate] state    ${store.describePersistence()}${seeded ? ', seeded the two demo passports' : ', loaded from snapshot'}`,
     );

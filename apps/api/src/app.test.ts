@@ -19,7 +19,7 @@ import { RuleBasedAIProvider } from './ai/provider.ts';
 import { createApp } from './app.ts';
 import type { AppConfig } from './config.ts';
 import { SimulatedDataProvider } from './data/provider.ts';
-import { LocalIdentityService } from './identity/service.ts';
+import { LocalIdentityService, type IdentityService } from './identity/service.ts';
 import { GatewayStore, seedDemoData } from './store.ts';
 
 const SUBJECT = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e';
@@ -64,7 +64,10 @@ interface Harness {
   json: <T = any>(path: string, init?: RequestInit) => Promise<{ status: number; body: T }>;
 }
 
-async function boot(overrides: Partial<AppConfig> = {}): Promise<Harness> {
+async function boot(
+  overrides: Partial<AppConfig> = {},
+  identityFor: (store: GatewayStore) => IdentityService = (store) => new LocalIdentityService(store),
+): Promise<Harness> {
   const store = new GatewayStore();
   seedDemoData(store, new Date('2026-09-10T00:00:00.000Z'));
   const app = createApp({
@@ -72,7 +75,7 @@ async function boot(overrides: Partial<AppConfig> = {}): Promise<Harness> {
     store,
     dataProvider: new SimulatedDataProvider(),
     aiProvider: new RuleBasedAIProvider(),
-    identity: new LocalIdentityService(store),
+    identity: identityFor(store),
     now: () => new Date('2026-09-10T12:00:00.000Z'),
   });
 
@@ -729,6 +732,50 @@ test('creating an agent that already exists, or with an empty scope, is refused'
     });
     assert.equal(badId.status, 400);
     assert.equal(badId.body.error.code, 'invalid_agent_id');
+  } finally {
+    await h.close();
+  }
+});
+
+// --- ENS mode ----------------------------------------------------------------
+
+/**
+ * An identity service in ENS mode with no chain behind it, where no name under
+ * the parent has a passport. Enough to test the gateway's ENS-mode rules
+ * without an RPC.
+ */
+function ensWithoutPassports(): IdentityService {
+  return {
+    mode: 'ens',
+    describe: () => 'ENS (test, no passports)',
+    resolve: async () => ({ agent: null, policy: null, source: 'none', note: 'no_passport_on_ens' }),
+    canRevokeLocally: (agentId) => !agentId.endsWith('.agents.faregate.eth'),
+  };
+}
+
+test('with ENS live, a passport under the parent cannot be created through the gateway', async () => {
+  const h = await boot({}, ensWithoutPassports);
+  try {
+    const policy = { allowedResources: ['wallet.balances'], maxCostPerQueryUsd: 0.1, dailyLimitUsd: 1, humanApprovalAboveUsd: 0.02 };
+    const created = await h.json('/agents', {
+      method: 'POST',
+      body: JSON.stringify({ label: 'ResearchBot', policy, by: HUMAN }),
+    });
+    assert.equal(created.status, 409);
+    assert.equal(created.body.error.code, 'create_onchain');
+    assert.ok(!h.store.getAgent('researchbot.agents.faregate.eth'));
+  } finally {
+    await h.close();
+  }
+});
+
+test('with ENS live, a passport is revoked onchain, not through the gateway', async () => {
+  const h = await boot({}, ensWithoutPassports);
+  try {
+    const revoked = await h.json(`/agents/${RESEARCH}/revoke`, { method: 'POST', body: JSON.stringify({ by: HUMAN }) });
+    assert.equal(revoked.status, 409);
+    assert.equal(revoked.body.error.code, 'revoke_onchain');
+    assert.equal(h.store.getAgent(RESEARCH)?.status, 'active');
   } finally {
     await h.close();
   }

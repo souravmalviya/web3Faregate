@@ -237,6 +237,16 @@ export function createApp(deps: AppDeps): Express {
         'A passport name is lowercase letters, digits and hyphens under a parent name, for example researchbot.agents.faregate.eth.',
       );
     }
+    // With ENS live, names under the parent are onchain passports and the chain
+    // is their only authority. A local row under such a name would be refused
+    // at its first request, so it is not created at all.
+    if (identity.mode === 'ens' && id.endsWith(`.${config.ens.parentName.toLowerCase()}`)) {
+      throw new HttpError(
+        409,
+        'create_onchain',
+        `ENS is live, so ${id} would be an ENS passport. Passports under ${config.ens.parentName} are created onchain with the owner's wallet (npm run ens:passport), not through the gateway.`,
+      );
+    }
     if (store.getAgent(id)) {
       throw new HttpError(409, 'agent_exists', `A passport named ${id} already exists.`);
     }

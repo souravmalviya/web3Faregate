@@ -37,6 +37,18 @@ function int(name: string, fallback: number): number {
 /** Hedera testnet CAIP-2 identifier, as defined by @x402/hedera. */
 export const HEDERA_TESTNET = 'hedera:testnet';
 
+/**
+ * Blocky402's hosted facilitators. Testnet and mainnet run on separate hosts,
+ * and each host's /supported lists only its own network, so the default has to
+ * follow the configured network.
+ */
+export const BLOCKY402_TESTNET = 'https://api.testnet.blocky402.com';
+export const BLOCKY402_MAINNET = 'https://api.blocky402.com';
+
+export function defaultFacilitator(network: string): string {
+  return network === 'hedera:mainnet' ? BLOCKY402_MAINNET : BLOCKY402_TESTNET;
+}
+
 /** Asset id x402 uses for native HBAR. */
 export const HBAR_ASSET = '0.0.0';
 
@@ -106,9 +118,10 @@ export interface AppConfig {
 
 function loadPayment(): PaymentConfig {
   const payTo = str('FAREGATE_PAY_TO');
+  const network = str('FAREGATE_NETWORK') ?? HEDERA_TESTNET;
   const base = {
-    network: str('FAREGATE_NETWORK') ?? HEDERA_TESTNET,
-    facilitatorUrl: str('X402_FACILITATOR_URL') ?? 'https://x402.org/facilitator',
+    network,
+    facilitatorUrl: str('X402_FACILITATOR_URL') ?? defaultFacilitator(network),
     payTo,
     asset: str('FAREGATE_ASSET') ?? USDC_TESTNET_ASSET,
     maxTimeoutSeconds: int('FAREGATE_PAYMENT_TIMEOUT_SECONDS', 120),

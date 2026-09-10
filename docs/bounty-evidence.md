@@ -9,7 +9,7 @@ it says otherwise.
 ```bash
 npm install && cp .env.example .env
 npm run build --workspace @faregate/shared
-npm test                       # 73 tests
+npm test                       # 80 tests
 npm run dev:api                # :8402
 npm run dev:web                # :3000
 ```

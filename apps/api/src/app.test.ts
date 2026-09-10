@@ -471,3 +471,25 @@ test('unknown routes return a structured 404', async () => {
     await h.close();
   }
 });
+
+// --- live payment wiring -------------------------------------------------
+
+test('live payment mode will not build without an initialised payment server', () => {
+  const store = new GatewayStore();
+  const config = simulatedConfig();
+  const live: AppConfig = {
+    ...config,
+    payment: { ...config.payment, mode: 'live', payTo: '0.0.10457565' },
+  };
+  assert.throws(
+    () =>
+      createApp({
+        config: live,
+        store,
+        dataProvider: new SimulatedDataProvider(),
+        aiProvider: new RuleBasedAIProvider(),
+        identity: new LocalIdentityService(store),
+      }),
+    /initialised payment server/,
+  );
+});

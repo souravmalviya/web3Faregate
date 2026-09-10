@@ -58,10 +58,20 @@ requires a Hedera testnet account with a USDC association, which the operator
 supplies in `.env` as `FAREGATE_PAY_TO`; the demo agent needs
 `HEDERA_ACCOUNT_ID` and `HEDERA_PRIVATE_KEY`.
 
-**Facilitator note.** Blocky402 hosts Hedera testnet and mainnet. The
-`X402_FACILITATOR_URL` default in `.env.example` points at Blocky402. The
-Hedera reference PoC uses `https://x402.org/facilitator` for testnet; either
-can be set.
+Verified 2026-09-10 against Blocky402 testnet: with a gateway account set,
+`GET /data/:id` answers `402` with a `PAYMENT-REQUIRED` header offering
+`exact` on `hedera:testnet`, USDC `0.0.429274`, the per-query amount in atomic
+units, `payTo` the gateway account, and Blocky402's fee payer `0.0.7162784`.
+A settled payment from the demo agent is the remaining step.
+
+**Facilitator.** Blocky402 runs Hedera testnet at
+`https://api.testnet.blocky402.com` and mainnet at `https://api.blocky402.com`,
+and each host's `/supported` lists only its own network. Faregate defaults to
+the Blocky402 host for the configured network and checks `/supported` before
+the gateway listens, refusing to start if the facilitator cannot settle
+`exact` on that network. The x402.org facilitator also supports
+`hedera:testnet`, and Hedera's reference PoC uses it for testnet, but this
+bounty requires Blocky402.
 
 **Demo evidence.** Demo agent output showing the paid request, the receipt
 with transaction id, and the dashboard's payment card.

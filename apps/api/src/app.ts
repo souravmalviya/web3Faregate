@@ -24,13 +24,13 @@ import {
   type ResourceQuery,
 } from '@faregate/shared';
 
+import type { x402HTTPResourceServer } from '@x402/core/server';
 import { paymentMiddlewareFromHTTPServer } from '@x402/express';
 
 import type { AIProvider } from './ai/provider.ts';
 import { describeModes, type AppConfig } from './config.ts';
 import type { DataProvider } from './data/provider.ts';
 import type { IdentityService } from './identity/service.ts';
-import { createHttpResourceServer } from './payment/x402.ts';
 import { parsePrompt, parseStructuredQuery, isAddress } from './query-parser.ts';
 import { createDataRouter } from './routes/data.ts';
 import { GatewayStore } from './store.ts';
@@ -41,6 +41,13 @@ export interface AppDeps {
   dataProvider: DataProvider;
   aiProvider: AIProvider;
   identity: IdentityService;
+  /**
+   * The x402 resource server, already initialised against its facilitator.
+   * Required in live payment mode. The entrypoint initialises it before the
+   * gateway listens, so a facilitator that cannot settle on the configured
+   * network stops startup instead of failing every paid request later.
+   */
+  paymentServer?: x402HTTPResourceServer;
   /** Injected so tests can pin time. */
   now?: () => Date;
 }
@@ -429,8 +436,15 @@ export function createApp(deps: AppDeps): Express {
   // to verify against, so the middleware is not mounted and the router issues a
   // receipt stamped `simulated`.
   if (config.payment.mode === 'live') {
-    const httpResourceServer = createHttpResourceServer({ config, store, identity, now });
-    app.use(paymentMiddlewareFromHTTPServer(httpResourceServer));
+    if (!deps.paymentServer) {
+      throw new Error(
+        'Live payment mode needs an initialised payment server. Build it with createHttpResourceServer and await initialize() before createApp.',
+      );
+    }
+    // Already initialised by the entrypoint, so the middleware must not start
+    // its own background sync, whose failure would go unhandled and end the
+    // process after /health had already reported payments as live.
+    app.use(paymentMiddlewareFromHTTPServer(deps.paymentServer, undefined, undefined, false));
   }
   app.use(
     createDataRouter({ config, store, dataProvider: deps.dataProvider, aiProvider, identity, now }),

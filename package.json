@@ -19,10 +19,11 @@
     "dev:api": "npm run dev --workspace @faregate/api",
     "dev:web": "npm run dev --workspace @faregate/web",
     "agent": "npm run start --workspace @faregate/agent",
-    "check": "npm run typecheck && npm test && npm run build",
+    "check": "npm run typecheck && npm test && npm run lint && npm run build",
     "ens:passport": "node scripts/ens/passport.ts",
     "hedera:usdc": "node scripts/hedera/usdc.ts",
-    "hedera:create-gateway": "node scripts/hedera/create-gateway.ts"
+    "hedera:create-gateway": "node scripts/hedera/create-gateway.ts",
+    "reset": "node -e \"require('fs').rmSync('data/faregate-state.json',{force:true});console.log('gateway state cleared')\""
   },
   "devDependencies": {
     "@hiero-ledger/sdk": "2.85.0"

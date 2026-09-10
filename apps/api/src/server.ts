@@ -1,8 +1,8 @@
 /** Gateway entrypoint. */
 
-import { OpenRouterAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import type { x402HTTPResourceServer } from '@x402/core/server';
 
+import { OpenRouterAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import { createApp } from './app.ts';
 import { BLOCKY402_MAINNET, BLOCKY402_TESTNET, describeModes, loadConfig } from './config.ts';
 import {
@@ -17,8 +17,13 @@ import { createHttpResourceServer } from './payment/x402.ts';
 import { GatewayStore, seedDemoData } from './store.ts';
 
 const config = loadConfig();
-const store = new GatewayStore();
-seedDemoData(store);
+
+// State survives restarts when a snapshot file is configured. The demo
+// passports are seeded only into an empty store: re-seeding on every start
+// would quietly un-revoke an agent the human had revoked before a restart.
+const store = new GatewayStore(config.stateFile ? { file: config.stateFile } : {});
+const seeded = store.listAgents().length === 0;
+if (seeded) seedDemoData(store);
 
 // A live provider is only built when it is actually configured. It never falls
 // back to simulated data at query time: a live provider that fails, fails.
@@ -97,7 +102,7 @@ function start(): void {
     ...(paymentServer ? { paymentServer } : {}),
   });
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     const modes = describeModes(config);
     console.log(`[faregate] gateway listening on http://localhost:${config.port}`);
     console.log(`[faregate] network ${config.payment.network}`);
@@ -115,6 +120,27 @@ function start(): void {
     console.log(`[faregate] data     ${dataProvider.describe()}`);
     console.log(`[faregate] ai       ${aiProvider.describe()}`);
     console.log(`[faregate] identity ${identity.describe()}`);
+    console.log(
+      `[faregate] state    ${store.describePersistence()}${seeded ? ', seeded the two demo passports' : ', loaded from snapshot'}`,
+    );
+    console.log(
+      `[faregate] actions  ${
+        config.requireSignedActions
+          ? 'human actions must be signed by the acting wallet'
+          : 'UNSIGNED human actions accepted (FAREGATE_REQUIRE_SIGNED_ACTIONS=false)'
+      }`,
+    );
     for (const note of notes) console.log(`[faregate] note: ${note}`);
   });
+
+  // Write any pending snapshot before the process ends, so the last action
+  // before Ctrl-C is not the one that gets lost.
+  const shutdown = (signal: string): void => {
+    console.log(`[faregate] ${signal}, saving state and stopping`);
+    store.flush();
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 2000).unref();
+  };
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
 }

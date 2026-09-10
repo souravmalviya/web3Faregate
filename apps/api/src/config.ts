@@ -34,6 +34,17 @@ function int(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function bool(name: string, fallback: boolean): boolean {
+  const raw = str(name)?.toLowerCase();
+  if (raw === undefined) return fallback;
+  if (['1', 'true', 'yes', 'on'].includes(raw)) return true;
+  if (['0', 'false', 'no', 'off'].includes(raw)) return false;
+  return fallback;
+}
+
+/** The repository root, which relative paths in the environment resolve against. */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+
 /** Hedera testnet CAIP-2 identifier, as defined by @x402/hedera. */
 export const HEDERA_TESTNET = 'hedera:testnet';
 
@@ -107,9 +118,24 @@ export interface EnsConfig {
   reason?: string;
 }
 
+export interface RateLimitConfig {
+  /** Requests each agent may submit per minute. */
+  requestsPerMinute: number;
+  /** Human actions each caller may perform per minute. */
+  actionsPerMinute: number;
+}
+
 export interface AppConfig {
   port: number;
   corsOrigin: string;
+  /**
+   * Whether approve, reject, revoke, policy and agent-creation calls must
+   * carry a wallet signature. On by default; off only for local experiments.
+   */
+  requireSignedActions: boolean;
+  /** Snapshot file for gateway state, or null to keep everything in memory. */
+  stateFile: string | null;
+  rateLimit: RateLimitConfig;
   payment: PaymentConfig;
   data: DataConfig;
   ai: AiConfig;
@@ -198,10 +224,22 @@ function loadEns(): EnsConfig {
   return { mode: 'live', rpcUrl, parentName, universalResolver };
 }
 
+function loadStateFile(): string | null {
+  const raw = str('FAREGATE_STATE_FILE') ?? 'data/faregate-state.json';
+  if (['off', 'none', 'memory'].includes(raw.toLowerCase())) return null;
+  return path.isAbsolute(raw) ? raw : path.resolve(REPO_ROOT, raw);
+}
+
 export function loadConfig(): AppConfig {
   return {
     port: int('PORT', 8402),
     corsOrigin: str('FAREGATE_CORS_ORIGIN') ?? 'http://localhost:3000',
+    requireSignedActions: bool('FAREGATE_REQUIRE_SIGNED_ACTIONS', true),
+    stateFile: loadStateFile(),
+    rateLimit: {
+      requestsPerMinute: Math.max(1, int('FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE', 60)),
+      actionsPerMinute: Math.max(1, int('FAREGATE_RATE_LIMIT_ACTIONS_PER_MINUTE', 30)),
+    },
     payment: loadPayment(),
     data: loadData(),
     ai: loadAi(),

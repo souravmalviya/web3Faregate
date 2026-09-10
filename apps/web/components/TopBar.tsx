@@ -46,6 +46,7 @@ export function TopBar({
 
           {wallet.address ? (
             <span className="flex items-center gap-2 border-l border-rule pl-4">
+              {wallet.name ? <span className="text-[12px] text-muted">{wallet.name}</span> : null}
               <span className="font-mono text-[12px] text-ink">{shortAddress(wallet.address)}</span>
               {wrongChain ? (
                 <Button variant="danger" onClick={onSwitchChain} title="Wallet is on the wrong network">

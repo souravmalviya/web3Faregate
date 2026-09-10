@@ -26,6 +26,7 @@ import {
   usd,
 } from '@/lib/api';
 import {
+  EMPTY_WALLET,
   EXPECTED_CHAIN,
   SignatureDeclined,
   connectWallet,
@@ -74,7 +75,7 @@ function useGateway() {
 }
 
 function useWallet() {
-  const [wallet, setWallet] = useState<WalletState>({ address: null, chainId: null, available: false });
+  const [wallet, setWallet] = useState<WalletState>(EMPTY_WALLET);
 
   useEffect(() => {
     void readWallet().then(setWallet);
@@ -84,10 +85,7 @@ function useWallet() {
   return {
     wallet,
     connect: async () => setWallet(await connectWallet()),
-    switchChain: async () => {
-      await switchToExpectedChain();
-      setWallet(await readWallet());
-    },
+    switchChain: async () => setWallet(await switchToExpectedChain()),
   };
 }
 
@@ -163,6 +161,12 @@ export default function Dashboard() {
         {error ? (
           <div className="rounded-sm border border-stop bg-stop-fill px-4 py-3 text-[14px] text-stop">
             {error}. Start the gateway with <code className="font-mono">npm run dev:api</code>.
+          </div>
+        ) : null}
+
+        {wallet.error ? (
+          <div role="alert" className="rounded-sm border border-stop bg-stop-fill px-4 py-3 text-[14px] text-stop">
+            {wallet.error}
           </div>
         ) : null}
 

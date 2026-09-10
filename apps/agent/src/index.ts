@@ -94,13 +94,24 @@ function buildFetch(): { fetchImpl: typeof fetch; paying: boolean } {
     return { fetchImpl: fetch, paying: false };
   }
 
-  const privateKey = PrivateKey.fromStringECDSA(rawKey);
+  const privateKey = parseHederaKey(rawKey);
   const signer = createClientHederaSigner(accountId, privateKey, { network: NETWORK });
   const client = new x402Client().register(
     NETWORK as `${string}:${string}`,
     new ExactHederaScheme(signer),
   );
   return { fetchImpl: wrapFetchWithPayment(fetch, client), paying: true };
+}
+
+/**
+ * The Hedera portal shows each key in two encodings. A raw ECDSA key is 64 hex
+ * characters; the DER form is longer and starts with an ASN.1 SEQUENCE. Either
+ * works here, with or without a 0x prefix.
+ */
+function parseHederaKey(raw: string): InstanceType<typeof PrivateKey> {
+  const text = raw.trim().replace(/^0x/i, '');
+  if (text.length > 64 && /^30/.test(text)) return PrivateKey.fromStringDer(text);
+  return PrivateKey.fromStringECDSA(text);
 }
 
 // --- gateway response shapes --------------------------------------------

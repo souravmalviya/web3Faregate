@@ -20,6 +20,7 @@
     "dev:web": "npm run dev --workspace @faregate/web",
     "agent": "npm run start --workspace @faregate/agent",
     "check": "npm run typecheck && npm test && npm run build",
-    "ens:passport": "node scripts/ens/passport.ts"
+    "ens:passport": "node scripts/ens/passport.ts",
+    "hedera:usdc": "node scripts/hedera/usdc.ts"
   }
 }

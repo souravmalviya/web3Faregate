@@ -115,7 +115,7 @@ apps/agent      the demo agent, a real x402 client in its own process
 packages/shared domain model, pricing, policy engine (pure, tested)
 scripts/ens     one-command ENSv2 setup, onchain revoke and restore of passports
 scripts/hedera  create the gateway account, check and associate USDC
-docs/           ARCHITECTURE, DECISIONS, DEMO_SCRIPT, SECURITY, SPONSOR_MATRIX, bounty evidence, ENS guide, OpenAPI
+docs/           ARCHITECTURE, DECISIONS, DEMO_SCRIPT, DEPLOY, SECURITY, SPONSOR_MATRIX, SUBMISSION, bounty evidence, ENS guide, OpenAPI
 ```
 
 ## Sponsor integrations
@@ -163,7 +163,8 @@ cp .env.example .env
 npm run build --workspace @faregate/shared
 ```
 
-Node 20 or newer (built on 24). No other services are required to run the
+Node 22.18 or newer (built on 24), because the TypeScript sources run directly
+with type stripping. No other services are required to run the
 demo; every subsystem simulates itself until you configure it.
 
 ```bash
@@ -208,6 +209,7 @@ Turn subsystems live one at a time in `.env`:
 | `ENS_UNIVERSAL_RESOLVER` | ENSv2 beta address | Override only if ENS redeploys |
 | `ENS_OWNER_PRIVATE_KEY` | unset | Throwaway Sepolia key, read only by `scripts/ens` (`ens:setup`, `ens:revoke`, `ens:restore`) |
 | `ENS_SETUP_RPC_URL` | public Sepolia RPC | RPC for the ENS scripts, kept apart from `ENS_RPC_URL` |
+| `FAREGATE_TRUST_PROXY` | `false` | `true` behind a hosting proxy, so per-caller limits see the client address |
 | `NEXT_PUBLIC_FAREGATE_GATEWAY_URL` | `http://localhost:8402` | Where the dashboard finds the gateway |
 
 ### Networks

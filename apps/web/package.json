@@ -5,6 +5,7 @@
   "description": "The Faregate dashboard: the human side of the gateway.",
   "scripts": {
     "dev": "next dev --port 3000",
+    "prebuild": "npm --prefix ../../packages/shared run build",
     "build": "next build",
     "start": "next start --port 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",

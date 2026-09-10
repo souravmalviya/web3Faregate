@@ -8,7 +8,7 @@ cp .env.example .env
 npm run build --workspace @faregate/shared
 ```
 
-Node 20 or newer. Node 24 is what this was built on.
+Node 22.18 or newer, since the sources run with type stripping. Node 24 is what this was built on.
 
 ## Running
 

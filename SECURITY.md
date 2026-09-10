@@ -71,7 +71,14 @@ carry one, and the signature has not been used before. The audit trail records
 `signed: true` on verified actions.
 
 **Rate limiting.** `apps/api/src/rate-limit.ts` limits request submissions per
-passport and human actions per caller, answering 429 with `Retry-After`.
+passport and per caller, and human actions and explanations per caller,
+answering 429 with `Retry-After`. Behind a hosting proxy, set
+`FAREGATE_TRUST_PROXY=true` so the caller is the client, not the proxy.
+
+**Unknown passports never reach the model.** Identity is resolved before
+interpretation. A request from a name with no passport is parsed by the free
+rule-based parser and refused, so nobody can spend model credits by inventing
+agent names.
 
 **Fail closed on identity.** When ENS is configured, a passport under the
 parent name that cannot be resolved because the chain is unreachable is treated
@@ -91,6 +98,11 @@ provider that fails, fails; it never falls back to simulated data.
   process. The gateway never sees it.
 - **Persistence is a local snapshot file.** Fine for one gateway on one
   machine; not a shared or replicated store.
+- **Single tenant, open reads.** The gateway serves one owner. Its read API
+  (`GET /requests`, `GET /events`, `GET /agents`) is the owner's dashboard
+  view and is not authenticated, so anyone who can reach the gateway can read
+  the queue, including data agents have collected. Run it for one owner, or
+  put it behind an authenticating proxy.
 - **Signatures prove who acted, not that they were entitled to.** Any wallet
   can create an agent or approve a request; there is no owner check tying an
   agent to the wallet that created it. Adding one is a policy field away.

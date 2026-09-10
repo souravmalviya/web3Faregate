@@ -5,7 +5,7 @@ should see at each step, and what to do when you do not.
 
 ## Prerequisites
 
-- Node 20 or newer. Built on Node 24.
+- Node 22.18 or newer. Built on Node 24.
 - A browser with an injected wallet (MetaMask or similar) on **Sepolia**. Every
   human action (creating an agent, approving, revoking, changing a policy) is
   signed by the wallet and verified by the gateway. Signing sends no

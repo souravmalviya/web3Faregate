@@ -1,0 +1,35 @@
+# Render blueprint for the Faregate gateway. See docs/DEPLOY.md.
+#
+# The gateway holds no private keys. Only the values marked sync: false are
+# entered in the Render dashboard, and none of them is a key that can move
+# funds: the agent's Hedera key and the ENS owner key stay on the operator's
+# machine.
+services:
+  - type: web
+    name: faregate-gateway
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace @faregate/shared
+    startCommand: node apps/api/src/server.ts
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: FAREGATE_TRUST_PROXY
+        value: "true"
+      - key: FAREGATE_NETWORK
+        value: hedera:testnet
+      - key: ENS_RPC_URL
+        value: https://ethereum-sepolia-rpc.publicnode.com
+      - key: FAREGATE_PARENT_NAME
+        value: agents.faregate.eth
+      - key: FAREGATE_CORS_ORIGIN
+        sync: false
+      - key: FAREGATE_PAY_TO
+        sync: false
+      - key: GRAPH_API_KEY
+        sync: false
+      - key: GRAPH_SUBGRAPHS
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false

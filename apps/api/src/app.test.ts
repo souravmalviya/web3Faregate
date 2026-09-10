@@ -15,7 +15,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 import { buildActionMessage, canonicalDigest, type HumanAction } from '@faregate/shared';
 
-import { RuleBasedAIProvider } from './ai/provider.ts';
+import { RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import { createApp } from './app.ts';
 import type { AppConfig } from './config.ts';
 import { SimulatedDataProvider } from './data/provider.ts';
@@ -67,6 +67,7 @@ interface Harness {
 async function boot(
   overrides: Partial<AppConfig> = {},
   identityFor: (store: GatewayStore) => IdentityService = (store) => new LocalIdentityService(store),
+  aiProvider: AIProvider = new RuleBasedAIProvider(),
 ): Promise<Harness> {
   const store = new GatewayStore();
   seedDemoData(store, new Date('2026-09-10T00:00:00.000Z'));
@@ -74,7 +75,7 @@ async function boot(
     config: { ...simulatedConfig(), ...overrides },
     store,
     dataProvider: new SimulatedDataProvider(),
-    aiProvider: new RuleBasedAIProvider(),
+    aiProvider,
     identity: identityFor(store),
     now: () => new Date('2026-09-10T12:00:00.000Z'),
   });
@@ -159,6 +160,29 @@ test('an unknown agent is refused as agent_unknown', async () => {
     assert.equal(status, 403);
     assert.equal(body.request.status, 'rejected');
     assert.deepEqual(body.request.decision.reasons.map((r: any) => r.code), ['agent_unknown']);
+  } finally {
+    await h.close();
+  }
+});
+
+test('an unknown passport is refused without a model call', async () => {
+  const neverCalled: AIProvider = {
+    name: 'openrouter',
+    describe: () => 'a model that must not be reached',
+    interpret: async () => {
+      throw new Error('the interpreter was called for an unknown passport');
+    },
+    explain: async () => 'unused',
+    analyze: async () => {
+      throw new Error('unused');
+    },
+  };
+  const h = await boot({}, undefined, neverCalled);
+  try {
+    const { status, body } = await submit(h, 'nobody.agents.faregate.eth', `Show the balances of ${SUBJECT}`);
+    assert.equal(status, 403);
+    assert.equal(body.request.decision.reasons[0].code, 'agent_unknown');
+    assert.equal(body.interpretedBy, 'rule-based');
   } finally {
     await h.close();
   }
@@ -801,6 +825,22 @@ test('an agent that submits too fast is rate limited with a Retry-After', async 
     // Another agent is unaffected: limits are per passport.
     const other = await submit(h, RESEARCH, `balance of ${SUBJECT} today`);
     assert.equal(other.status, 201);
+  } finally {
+    await h.close();
+  }
+});
+
+test('one caller cannot dodge the passport limit by inventing names', async () => {
+  const h = await boot({ rateLimit: { requestsPerMinute: 1, actionsPerMinute: 1000 } });
+  try {
+    // The per-caller layer is five times the per-passport limit.
+    for (let i = 0; i < 5; i += 1) {
+      const { status } = await submit(h, `made-up-${i}.agents.faregate.eth`, `balance of ${SUBJECT} today`);
+      assert.equal(status, 403, `unknown passport ${i} is refused, not rate limited`);
+    }
+    const sixth = await submit(h, 'made-up-5.agents.faregate.eth', `balance of ${SUBJECT} today`);
+    assert.equal(sixth.status, 429);
+    assert.equal(sixth.body.error.code, 'rate_limited');
   } finally {
     await h.close();
   }

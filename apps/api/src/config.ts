@@ -129,6 +129,12 @@ export interface AppConfig {
   port: number;
   corsOrigin: string;
   /**
+   * Trust the first X-Forwarded-For hop. Needed behind a hosting provider's
+   * proxy, otherwise every caller shares the proxy's address and one per-caller
+   * rate limit covers the whole internet.
+   */
+  trustProxy?: boolean;
+  /**
    * Whether approve, reject, revoke, policy and agent-creation calls must
    * carry a wallet signature. On by default; off only for local experiments.
    */
@@ -234,6 +240,7 @@ export function loadConfig(): AppConfig {
   return {
     port: int('PORT', 8402),
     corsOrigin: str('FAREGATE_CORS_ORIGIN') ?? 'http://localhost:3000',
+    trustProxy: bool('FAREGATE_TRUST_PROXY', false),
     requireSignedActions: bool('FAREGATE_REQUIRE_SIGNED_ACTIONS', true),
     stateFile: loadStateFile(),
     rateLimit: {

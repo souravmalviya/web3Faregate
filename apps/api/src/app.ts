@@ -149,9 +149,12 @@ export function createApp(deps: AppDeps): Express {
   app.use(express.json({ limit: '64kb' }));
   app.use(cors({ origin: config.corsOrigin }));
   app.disable('x-powered-by');
+  if (config.trustProxy) app.set('trust proxy', 1);
 
   // Agents are limited per passport, so one runaway agent cannot starve the
-  // others or run up a model bill; humans are limited per caller.
+  // others or run up a model bill; humans are limited per caller. A second,
+  // per-caller layer on submissions means a caller cannot dodge the passport
+  // limit by inventing passport names.
   const agentLimiter = rateLimit({
     limit: config.rateLimit.requestsPerMinute,
     windowMs: 60_000,
@@ -159,6 +162,14 @@ export function createApp(deps: AppDeps): Express {
       const agentId = (req.body as { agentId?: unknown } | undefined)?.agentId;
       return typeof agentId === 'string' && agentId.length > 0 ? `agent:${agentId}` : callerKey(req);
     },
+    now,
+  });
+  // Looser than the per-passport limit, so one caller may drive several
+  // passports, but still a bound on what one address can make the gateway do.
+  const callerLimiter = rateLimit({
+    limit: config.rateLimit.requestsPerMinute * 5,
+    windowMs: 60_000,
+    keyOf: (req) => `caller:${callerKey(req)}`,
     now,
   });
   const actionLimiter = rateLimit({
@@ -379,7 +390,7 @@ export function createApp(deps: AppDeps): Express {
    * request is cleared to proceed, the price the agent must pay. Data is only
    * released by the paid `/data/:id` route once a payment has settled.
    */
-  app.post('/requests', agentLimiter, wrap(async (req: Request, res: Response) => {
+  app.post('/requests', callerLimiter, agentLimiter, wrap(async (req: Request, res: Response) => {
     const parsed = createRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new HttpError(400, 'invalid_request', parsed.error.issues[0]?.message ?? 'Invalid request.');
@@ -404,10 +415,21 @@ export function createApp(deps: AppDeps): Express {
     // interpreter, whose proposal is untrusted and is validated by the same
     // rule-based parser. If the proposal fails validation, the rule-based
     // parser has the final word. The model can suggest; it cannot widen scope.
+    //
+    // Identity is resolved first. An unknown passport is refused whatever it
+    // asked for, so its prompt goes through the free rule-based parser and
+    // never reaches the model: on a public gateway, nobody can spend model
+    // credits by inventing passport names.
+    const resolved = await identity.resolve(agentId, at);
+    const { agent, policy } = resolved;
+
     let parseResult: { query: ResourceQuery | null; note: string };
     let interpretedBy: AIProvider['name'] | 'structured' = 'structured';
     if (rawQuery !== undefined) {
       parseResult = parseStructuredQuery(rawQuery);
+    } else if (!agent) {
+      parseResult = parsePrompt(prompt ?? '');
+      interpretedBy = 'rule-based';
     } else {
       const interpretation = await aiProvider.interpret(prompt ?? '');
       const validated = parseStructuredQuery(interpretation.proposal);
@@ -419,9 +441,6 @@ export function createApp(deps: AppDeps): Express {
         interpretedBy = 'rule-based';
       }
     }
-
-    const resolved = await identity.resolve(agentId, at);
-    const { agent, policy } = resolved;
 
     const decision = evaluatePolicy({
       agent,
@@ -518,7 +537,8 @@ export function createApp(deps: AppDeps): Express {
    * Explains a decision in prose, on demand. The explanation narrates what the
    * deterministic engine already decided; it is never an input to it.
    */
-  app.get('/requests/:id/explain', wrap(async (req: Request, res: Response) => {
+  // Explanations call the model, so they carry the human-action limit.
+  app.get('/requests/:id/explain', actionLimiter, wrap(async (req: Request, res: Response) => {
     const request = store.getRequest(String(req.params.id));
     if (!request) throw new HttpError(404, 'request_not_found', 'No such request.');
     if (!request.decision) throw new HttpError(409, 'not_evaluated', 'Request has no decision yet.');

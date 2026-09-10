@@ -27,10 +27,6 @@
  * never printed.
  */
 
-import { config as loadDotenv } from 'dotenv';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import {
   AccountId,
   Client,
@@ -42,9 +38,21 @@ import {
   TokenId,
 } from '@x402/hedera';
 
-loadDotenv({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.env') });
+import {
+  ACCOUNT_RE,
+  arg,
+  env,
+  errorMessage,
+  fail,
+  flag,
+  keyMatches,
+  loadEnv,
+  mirror,
+  parseHederaKey,
+  type MirrorAccount,
+} from './common.ts';
 
-const ACCOUNT_RE = /^0\.0\.\d+$/;
+loadEnv();
 
 type Who = 'agent' | 'gateway';
 
@@ -53,65 +61,13 @@ const ROLE: Record<Who, { idVar: string; keyVar: string; describe: string }> = {
   gateway: { idVar: 'FAREGATE_PAY_TO', keyVar: 'FAREGATE_PAY_TO_PRIVATE_KEY', describe: 'gateway (receives)' },
 };
 
-// --- args ----------------------------------------------------------------
-
-function arg(name: string): string | undefined {
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
-
-function flag(name: string): boolean {
-  return process.argv.includes(`--${name}`);
-}
-
-function fail(message: string, code = 2): never {
-  console.error(message);
-  process.exit(code);
-}
-
-function env(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value ? value : undefined;
-}
-
-// --- keys ----------------------------------------------------------------
-
-/**
- * Accepts the HEX or the DER encoding of a key. A raw ECDSA key is 64 hex
- * characters; DER-encoded keys are longer and start with an ASN.1 SEQUENCE.
- */
-export function parseHederaKey(raw: string): PrivateKey {
-  const text = raw.trim().replace(/^0x/i, '');
-  if (!/^[0-9a-fA-F]+$/.test(text)) throw new Error('key is not hex');
-  if (text.length > 64 && /^30/.test(text)) return PrivateKey.fromStringDer(text);
-  if (text.length === 64) return PrivateKey.fromStringECDSA(text);
-  throw new Error(`unexpected key length ${text.length}`);
-}
-
 // --- mirror node ---------------------------------------------------------
-
-interface MirrorAccount {
-  account: string;
-  deleted: boolean;
-  max_automatic_token_associations: number;
-  balance?: { balance: number };
-  key?: { _type: string; key: string } | null;
-}
 
 interface MirrorTokenRelationship {
   token_id: string;
   balance: number;
   decimals: number;
   automatic_association: boolean;
-}
-
-async function mirror<T>(pathname: string): Promise<T | null> {
-  const response = await fetch(`${HEDERA_TESTNET_MIRROR_NODE_URL}${pathname}`, {
-    headers: { accept: 'application/json' },
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`mirror node returned HTTP ${response.status} for ${pathname}`);
-  return (await response.json()) as T;
 }
 
 interface AccountReport {
@@ -230,14 +186,12 @@ async function associate(): Promise<void> {
   try {
     key = parseHederaKey(rawKey);
   } catch (error) {
-    fail(`\n${keyVar} could not be read: ${error instanceof Error ? error.message : String(error)}`);
+    fail(`\n${keyVar} could not be read: ${errorMessage(error)}`);
   }
 
   // Refuse early with a clear message rather than failing onchain with
   // INVALID_SIGNATURE. --force skips this if the encodings ever disagree.
-  const onChain = report.publicKey?.toLowerCase();
-  const derived = key.publicKey.toStringRaw().toLowerCase();
-  const matches = onChain !== undefined && onChain === derived;
+  const matches = keyMatches(key, report.publicKey);
   console.log(`\n  ${keyVar} matches account key: ${matches ? 'yes' : 'NO'}`);
   if (!matches && !flag('force')) {
     fail(`  The key in ${keyVar} does not belong to ${id}. Fix .env, or pass --force if you are sure.`);
@@ -262,7 +216,7 @@ async function associate(): Promise<void> {
     const txId = response.transactionId.toString();
     console.log(`\n  status  ${receipt.status.toString()}`);
     console.log(`  tx      ${txId}`);
-    console.log(`  view    https://hashscan.io/testnet/transaction/${txId}`);
+    console.log(`  view    https://hashscan.io/testnet/account/${id}`);
   } finally {
     client.close();
   }
@@ -272,6 +226,6 @@ const command = process.argv[2];
 const run = command === 'status' ? status : command === 'associate' ? associate : null;
 if (!run) fail('usage: usdc.ts <status|associate> [--account 0.0.x] [--who agent|gateway] [--send]');
 run().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(errorMessage(error));
   process.exit(1);
 });

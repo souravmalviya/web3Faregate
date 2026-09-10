@@ -151,8 +151,18 @@ interface DataResponse {
   budget: { chargedUsd: number; spentTodayUsd: number };
 }
 
+/**
+ * The gateway's own errors are `{ error: { code, message } }`. A refusal from
+ * the x402 middleware in live payment mode is `{ error: "message" }`. Both are
+ * a reason a human can read, so both are handled.
+ */
 interface ErrorResponse {
-  error?: { message?: string };
+  error?: string | { message?: string };
+}
+
+function errorMessage(body: ErrorResponse, fallback: string): string {
+  if (typeof body.error === 'string') return body.error;
+  return body.error?.message ?? fallback;
 }
 
 // --- gateway calls -------------------------------------------------------
@@ -234,13 +244,7 @@ async function main(): Promise<number> {
 
   if (request.status === 'awaiting_approval') {
     step('Wait for a human to approve');
-    warn(`Approve it in the dashboard, or run:`);
-    console.log(
-      `   ${DIM}curl -X POST ${GATEWAY}/requests/${request.id}/approval -H 'content-type: application/json' \\`,
-    );
-    console.log(
-      `        -d '{"decision":"approved","by":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'${RESET}`,
-    );
+    warn('Approve it in the dashboard. The approval is signed by the owner wallet; the agent cannot approve itself.');
 
     const deadline = Date.now() + args.waitSeconds * 1000;
     let approved = false;
@@ -266,7 +270,7 @@ async function main(): Promise<number> {
 
   if (dataResponse.status === 403) {
     const body = (await dataResponse.json().catch(() => ({}))) as ErrorResponse;
-    fail(`Refused at the gate: ${body.error?.message ?? 'forbidden'}`);
+    fail(`Refused at the gate: ${errorMessage(body, 'forbidden')}`);
     console.log(`   ${DIM}The agent offered to pay and was still turned away.${RESET}`);
     return 4;
   }

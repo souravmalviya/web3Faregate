@@ -62,16 +62,24 @@ const HEX_TOKEN_RE = /0x[a-fA-F0-9]{8,64}/g;
 /**
  * Checks model text against the data it was asked to describe.
  *
- * Any 0x-prefixed hex token in the text that does not appear in the serialised
- * data is treated as fabricated. It is replaced with a visible marker rather
- * than silently deleted, so a reader can see that something was removed and
- * the audit trail records what it was.
+ * Any 0x-prefixed hex token in the text that appears neither in the serialised
+ * data nor in `known` is treated as fabricated. `known` carries values the
+ * gateway itself supplied and validated, such as the address the request was
+ * about, which event data does not repeat. A fabricated token is replaced with
+ * a visible marker rather than silently deleted, so a reader can see that
+ * something was removed and the audit trail records what it was.
  */
-export function groundAnalysis(text: string, data: unknown): { text: string; warnings: string[] } {
+export function groundAnalysis(
+  text: string,
+  data: unknown,
+  known: readonly string[] = [],
+): { text: string; warnings: string[] } {
   const haystack = JSON.stringify(data ?? '').toLowerCase();
+  const trusted = new Set(known.map((value) => value.toLowerCase()));
   const warnings: string[] = [];
   const grounded = text.replace(HEX_TOKEN_RE, (token) => {
-    if (haystack.includes(token.toLowerCase())) return token;
+    const lower = token.toLowerCase();
+    if (trusted.has(lower) || haystack.includes(lower)) return token;
     warnings.push(token);
     return '[unverified value removed]';
   });
@@ -347,7 +355,9 @@ export class OpenRouterAIProvider implements AIProvider {
         max_tokens: 600,
         temperature: 0,
       });
-      const grounded = groundAnalysis(raw, data);
+      // The subject address came from the validated query, not from the model,
+      // so it is trusted even though the event data does not repeat it.
+      const grounded = groundAnalysis(raw, data, [query.address]);
       return { text: grounded.text, provider: this.name, groundingWarnings: grounded.warnings };
     } catch (error) {
       logModelError('analyze', error);

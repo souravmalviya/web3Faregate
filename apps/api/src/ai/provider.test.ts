@@ -37,6 +37,20 @@ test('grounding is case-insensitive on hex', () => {
   assert.equal(out.warnings.length, 0);
 });
 
+test('grounding keeps the validated subject address even when the data does not repeat it', () => {
+  const data = { deposits: [{ hash: '0xabcdef1234567890abcdef1234567890' }] };
+  const out = groundAnalysis(`The wallet at ${ADDRESS} deposited once.`, data, [ADDRESS]);
+  assert.equal(out.warnings.length, 0);
+  assert.match(out.text, new RegExp(ADDRESS));
+});
+
+test('grounding still removes an address that is neither the subject nor in the data', () => {
+  const other = '0x1111111111111111111111111111111111111111';
+  const out = groundAnalysis(`Funds moved to ${other}.`, {}, [ADDRESS]);
+  assert.deepEqual(out.warnings, [other]);
+  assert.doesNotMatch(out.text, /0x1111/);
+});
+
 test('grounding leaves short hex-like fragments alone', () => {
   // Fewer than 8 hex chars is not treated as an onchain identifier.
   const out = groundAnalysis('code 0xdead was set', {});
@@ -195,15 +209,18 @@ test('openrouter out of credits is logged as such and the explanation still arri
 test('openrouter analysis is grounding-checked against the retrieved data', async (t) => {
   t.mock.method(console, 'error', () => {});
   const data = { events: [{ hash: '0xabcdef1234567890abcdef1234567890' }] };
+  // The subject address is written in checksum-style uppercase, as a model
+  // might, and must survive; the invented hash must not.
   const { ai } = openRouter(() =>
     completion(
-      'The largest transfer was 0xabcdef1234567890abcdef1234567890, followed by 0xdeadbeefdeadbeefdeadbeefdeadbeef.',
+      'Wallet 0x742D35CC6634C0532925A3B844BC454E4438F44E: the largest transfer was 0xabcdef1234567890abcdef1234567890, followed by 0xdeadbeefdeadbeefdeadbeefdeadbeef.',
     ),
   );
   const query: ResourceQuery = { resource: 'wallet.transfers', address: ADDRESS, lookbackDays: 7 };
   const out = await ai.analyze(query, data, provenance);
   assert.equal(out.provider, 'openrouter');
   assert.deepEqual(out.groundingWarnings, ['0xdeadbeefdeadbeefdeadbeefdeadbeef']);
+  assert.match(out.text, /0x742D35CC6634C0532925A3B844BC454E4438F44E/);
   assert.match(out.text, /0xabcdef1234567890abcdef1234567890/);
   assert.doesNotMatch(out.text, /0xdeadbeef/);
 });

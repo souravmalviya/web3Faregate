@@ -198,7 +198,7 @@ npm run agent -- --agent research.agents.faregate.eth --request <id>
 ## Tests
 
 ```bash
-npm test          # 86 tests: policy engine, pricing, store, AI grounding, data fan-out, HTTP surface
+npm test          # 88 tests: policy engine, pricing, store, AI grounding, data fan-out, HTTP surface
 npm run typecheck
 npm run build
 ```

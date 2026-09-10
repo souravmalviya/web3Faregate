@@ -119,8 +119,17 @@ schema; the operator pins a subgraph that publishes it (`.env.example` ships Mes
 **Demo evidence.** A fulfilled request in the dashboard with provenance
 `the-graph`, the raw data panel, and the grounded analysis.
 
-**Confidence.** High on integration shape. Medium until the pinned subgraph's
-entity names are confirmed against a live query.
+**Verified live 2026-09-10.** Through the gateway, an agent's plain-English
+request was interpreted by OpenRouter (`openai/gpt-4.1-mini`) into
+`wallet.activity` over 30 days, held for human approval at $0.036, released
+with data from The Graph (`provenance: the-graph`, not simulated) across Aave
+v3, Compound v3 and Spark, and summarised by the model with the grounding
+check applied. A second request, which the model mapped to
+`protocol.positions`, was refused by the deterministic policy because that
+resource is outside the agent's scope: the model cannot widen what an agent
+may buy.
+
+**Confidence.** High.
 
 ### Best Use of Composable or Standardized Graph Products ($5,000, 3 places)
 
@@ -147,8 +156,12 @@ partial failure, total failure, and Bearer-header auth.
 is one entry in an environment variable, and every existing query works
 against it on the next request.
 
-**Confidence.** High on the mechanism. Live breadth depends on the operator
-pinning subgraphs that publish the Messari standard schema.
+**Verified live 2026-09-10.** All five query documents returned data from the
+Aave v3, Compound v3 and Spark subgraphs listed in `.env.example`, with no
+schema errors, and a markets query fanned out to all three in about 0.7
+seconds.
+
+**Confidence.** High.
 
 **Official documentation.** https://thegraph.com/docs/en/subgraphs/existing-subgraphs/standard-subgraphs/ ,
 https://thegraph.com/docs/en/subgraphs/querying/managing-api-keys/

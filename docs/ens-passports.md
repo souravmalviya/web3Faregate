@@ -47,20 +47,43 @@ From the ENS deployments page, https://docs.ens.domains/learn/deployments :
 The gateway uses `UniversalResolverV2` by default; override with
 `ENS_UNIVERSAL_RESOLVER` if ENS redeploys.
 
-## Setting up the parent name
+## Setting up the names
 
-This is a one-time setup with a funded Sepolia wallet.
+One command does the whole setup on Sepolia, at no real cost:
 
-1. **Register `faregate.eth`** on Sepolia through the ETHRegistrar. The ENS
-   manager app on Sepolia does this from a browser wallet.
-2. **Deploy a UserRegistry proxy** for `agents.faregate.eth` through the
-   VerifiableFactory. The `ProxyDeployed` event in the receipt carries the
-   proxy address. Guide: https://docs.ens.domains/ensv2/tutorial-contract-developers
-3. **Point the parent at it**: call `setSubregistry(labelhash("agents"), proxy)`
-   on the registry that holds `faregate.eth`. Until this is done, names minted
-   in the UserRegistry exist as tokens but do not resolve.
-4. **Deploy a Permissioned Resolver** instance for the passports, again via the
-   factory, so the owner holds `ROLE_SET_TEXT` on the nodes.
+```bash
+npm run ens:setup -- --owner 0xYourTestAccount   # dry run: checks and simulates, sends nothing
+npm run ens:setup -- --send                      # with ENS_OWNER_PRIVATE_KEY in .env
+```
+
+What it needs:
+
+- A **fresh test account**, for example a new MetaMask account. Its key goes in
+  `.env` as `ENS_OWNER_PRIVATE_KEY`, so it must never hold real funds.
+- About **0.005 Sepolia ETH** for gas, free from a faucet such as
+  https://ethglobal.com/faucet. The registration fee is charged in MockUSDC,
+  which anyone can mint for free, and the script mints it.
+
+What it does, skipping anything already done:
+
+1. Deploys one **PermissionedResolver** through the VerifiableFactory. It holds
+   every passport record, and the owner can change any of them.
+2. Deploys a **UserRegistry** for `faregate.eth` and another for
+   `agents.faregate.eth`.
+3. Mints and approves **MockUSDC**, then **registers `faregate.eth`** through
+   the ETHRegistrar (commit, wait 60 seconds, register), with the first
+   registry as its subregistry.
+4. Registers **`agents.faregate.eth`** in that registry, pointing at the second.
+5. Sets **parent pointers** so explorers can show the full names.
+6. Registers the demo passports (`research`, `trial`) and writes their
+   `faregate.*` records and address, one multicall per passport.
+7. Reads every passport back through the Universal Resolver, as the gateway
+   will.
+
+Every transaction is simulated first and is not sent if the simulation fails,
+and the script refuses to run against any chain but Sepolia. Addresses are
+saved in `data/ens-setup.json`, so an interrupted run carries on where it
+stopped. The full setup is about 14 transactions.
 
 ## Minting a passport
 

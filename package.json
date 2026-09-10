@@ -21,6 +21,7 @@
     "agent": "node apps/agent/src/index.ts",
     "check": "npm run typecheck && npm test && npm run lint && npm run build",
     "ens:passport": "node scripts/ens/passport.ts",
+    "ens:setup": "node scripts/ens/setup.ts",
     "hedera:usdc": "node scripts/hedera/usdc.ts",
     "hedera:create-gateway": "node scripts/hedera/create-gateway.ts",
     "reset": "node -e \"require('fs').rmSync('data/faregate-state.json',{force:true});console.log('gateway state cleared')\""

@@ -53,7 +53,6 @@ import {
   namehash,
   parseAbi,
   type Address,
-  type Hex,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
@@ -120,12 +119,13 @@ function clients() {
   const send = flag('send');
   if (!send) return { publicClient, walletClient: null, account: null, send };
 
-  const key = process.env.ENS_OWNER_PRIVATE_KEY;
-  if (!key || !/^0x[a-fA-F0-9]{64}$/.test(key)) {
-    console.error('ENS_OWNER_PRIVATE_KEY must be a 0x-prefixed 32-byte hex key when using --send');
+  // MetaMask exports keys without 0x, so either form is accepted.
+  const key = process.env.ENS_OWNER_PRIVATE_KEY?.trim().replace(/^0x/i, '');
+  if (!key || !/^[a-fA-F0-9]{64}$/.test(key)) {
+    console.error('ENS_OWNER_PRIVATE_KEY must be a 32-byte hex key (64 characters, 0x optional) when using --send');
     process.exit(2);
   }
-  const account = privateKeyToAccount(key as Hex);
+  const account = privateKeyToAccount(`0x${key}`);
   const walletClient = createWalletClient({ account, chain: sepolia, transport: http(rpcUrl) });
   return { publicClient, walletClient, account, send };
 }

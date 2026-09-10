@@ -38,12 +38,22 @@
  *     --registry 0x... --label research --owner 0x... --resolver 0x... \
  *     [--expiry-days 365] [--send]
  *
+ * After `npm run ens:setup`, --resolver defaults to the resolver it deployed,
+ * and the demo shortcuts are:
+ *
+ *   npm run ens:revoke -- research.agents.faregate.eth   (revoke onchain)
+ *   npm run ens:restore                                  (set every demo passport back to active)
+ *
  * Environment:
- *   ENS_RPC_URL           Sepolia RPC
+ *   ENS_RPC_URL           Sepolia RPC, defaults to a public endpoint
  *   ENS_OWNER_PRIVATE_KEY the passport owner's key, Sepolia only, never mainnet
  */
 
 import 'dotenv/config';
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   createPublicClient,
@@ -108,12 +118,19 @@ function asAddress(v: string, what: string): Address {
 
 // --- clients -------------------------------------------------------------
 
-function clients() {
-  const rpcUrl = process.env.ENS_RPC_URL;
-  if (!rpcUrl) {
-    console.error('ENS_RPC_URL is not set');
-    process.exit(2);
+/** The resolver `npm run ens:setup` deployed, so --resolver can be left out after setup. */
+function savedResolver(): string | undefined {
+  try {
+    const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/ens-setup.json');
+    return (JSON.parse(fs.readFileSync(file, 'utf8')) as { resolver?: string }).resolver;
+  } catch {
+    return undefined;
   }
+}
+
+function clients() {
+  const rpcUrl =
+    process.env.ENS_RPC_URL?.trim() || process.env.ENS_SETUP_RPC_URL?.trim() || 'https://ethereum-sepolia-rpc.publicnode.com';
   const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
 
   const send = flag('send');
@@ -169,7 +186,7 @@ async function execute(calls: Call[]): Promise<void> {
 
 async function records(): Promise<void> {
   const name = normalize(need('name'));
-  const resolver = asAddress(need('resolver'), '--resolver');
+  const resolver = asAddress(arg('resolver') ?? savedResolver() ?? need('resolver'), '--resolver');
   const node = namehash(name);
 
   const values: Array<[string, string]> = [
@@ -202,7 +219,7 @@ async function records(): Promise<void> {
 
 async function revoke(): Promise<void> {
   const name = normalize(need('name'));
-  const resolver = asAddress(need('resolver'), '--resolver');
+  const resolver = asAddress(arg('resolver') ?? savedResolver() ?? need('resolver'), '--resolver');
   const node = namehash(name);
   await execute([
     {
@@ -219,7 +236,7 @@ async function register(): Promise<void> {
   const registry = asAddress(need('registry'), '--registry');
   const label = need('label');
   const owner = asAddress(need('owner'), '--owner');
-  const resolver = asAddress(need('resolver'), '--resolver');
+  const resolver = asAddress(arg('resolver') ?? savedResolver() ?? need('resolver'), '--resolver');
   const days = Number.parseInt(arg('expiry-days') ?? '365', 10);
   const expiry = BigInt(Math.floor(Date.now() / 1000) + days * 86_400);
   // The owner may change the resolver and renew; nothing else. Revocation is

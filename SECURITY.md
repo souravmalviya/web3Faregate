@@ -47,7 +47,12 @@ between approval and collection is refused at the gate while holding an
 approved quote. This is the property the demo exists to show.
 
 **Spend is recorded at collection, not at quote.** An agent cannot exhaust its
-own budget, or anyone else's, by requesting prices it never pays.
+own budget, or anyone else's, by requesting prices it never pays. The fare is
+reserved when collection starts, so concurrent requests cannot overspend a
+limit, and released if the data does not reach the agent. The x402 middleware
+does not settle a payment when the gateway answers with an error, so a data
+provider outage or a failed settlement charges nothing. One request is
+collected by one caller at a time.
 
 **Replay.** Payment nonces are single-use (`GatewayStore.consumeNonce`), and a
 fulfilled request cannot be collected twice. Request creation is idempotent on

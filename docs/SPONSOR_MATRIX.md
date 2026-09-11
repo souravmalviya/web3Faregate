@@ -14,7 +14,7 @@ and the evidence so a judge can check.
 
 | Sponsor | Bounty | Requirement | Faregate feature | Actual implementation | Tested | Demo evidence | Status |
 |---|---:|---|---|---|---|---|---|
-| Hedera | $6,000 | Live x402-gated service on Hedera settled via Blocky402; an agent completes a real paid request; README; video of 5 min or less | `GET /data/:id` is x402-gated, priced per query in USDC; `apps/agent` pays | `@x402/core`, `@x402/express`, `@x402/hedera` v2.25; gateway account `0.0.10457565`; facilitator `api.testnet.blocky402.com` checked at startup | Gate, policy re-check, spend ledger, replay: `apps/api/src/app.test.ts` | Live `402` with `PAYMENT-REQUIRED` verified 2026-09-10; settlement pending faucet USDC for the agent account | IMPLEMENTED, TESTED |
+| Hedera | $6,000 | Live x402-gated service on Hedera settled via Blocky402; an agent completes a real paid request; README; video of 5 min or less | `GET /data/:id` is x402-gated, priced per query in USDC; `apps/agent` pays | `@x402/core`, `@x402/express`, `@x402/hedera` v2.25; gateway account `0.0.10457565`; facilitator `api.testnet.blocky402.com` checked at startup | Gate, policy re-check, spend ledger, replay: `apps/api/src/app.test.ts` | Settled x402 payments on Hedera testnet through Blocky402 on 2026-09-11: $0.036 after a signed human approval and $0.0102 with no human, USDC moved agent to gateway; HashScan links in `docs/bounty-evidence.md`; `npm run e2e:live` 26/26 | DEMONSTRATED |
 | The Graph | $5,000 | Graph as load-bearing data; live Studio data; meaningful reasoning or NL interface; open source; video 2 to 4 min; Start Fresh pool | Sole data source; NL interpretation; grounded analysis | `apps/api/src/data/provider.ts`, `apps/api/src/ai/provider.ts`; Bearer-auth gateway queries | Grounding and provider tests | Live run 2026-09-10: NL ask, OpenRouter interpretation, Graph data from Aave, Compound and Spark, grounded summary | DEMONSTRATED |
 | The Graph | $5,000 | Standardized subgraphs: one query across many protocols; show what the standard made easier | Messari-standard documents, multi-protocol fan-out | `GRAPH_SUBGRAPHS` targets; `GraphDataProvider.fetch` fan-out keyed by protocol | 10 fan-out tests including schema conformance to Messari lending 3.1.0 | All five documents live against three protocols with no schema errors, 2026-09-10 | DEMONSTRATED |
 | ENS | $4,500 | Built on ENSv2 Sepolia; central; functional, nothing hardcoded; video or live demo | Passports as ENSv2 subnames; capability in text records; live resolution; onchain revocation; fail closed | `apps/api/src/identity/*`, `scripts/ens/setup.ts`, `scripts/ens/passport.ts` | ENS-mode create and revoke rules in `apps/api/src/app.test.ts`; the setup simulates every call before sending it | `faregate.eth` and two passports registered on Sepolia 2026-09-10 and resolved live by the gateway; addresses in `docs/bounty-evidence.md` | DEMONSTRATED |
@@ -47,8 +47,9 @@ the 402, signs a Hedera transfer, and retries with the payment header.
 - `apps/api/src/payment/x402.ts` builds the resource server with
   `ExactHederaScheme`, registers `onProtectedRequest` (policy re-check before
   a price is quoted), and quotes a dynamic per-request price.
-- `apps/api/src/routes/data.ts` releases data only after verification and
-  records spend before serving.
+- `apps/api/src/routes/data.ts` releases data only after verification,
+  reserves the fare while collecting, and releases it if the data does not
+  reach the agent (the middleware does not settle an error response).
 - `apps/agent/src/index.ts` wraps fetch with `wrapFetchWithPayment` and an
   `ExactHederaScheme` client signer.
 - `apps/api/src/config.ts` defaults the fare asset to testnet USDC because its
@@ -72,7 +73,13 @@ Verified 2026-09-10 against Blocky402 testnet: with a gateway account set,
 `GET /data/:id` answers `402` with a `PAYMENT-REQUIRED` header offering
 `exact` on `hedera:testnet`, USDC `0.0.429274`, the per-query amount in atomic
 units, `payTo` the gateway account, and Blocky402's fee payer `0.0.7162784`.
-A settled payment from the demo agent is the remaining step.
+
+Settled 2026-09-11: the demo agent completed two paid requests end to end,
+each a Hedera `CRYPTOTRANSFER` of USDC `0.0.429274` from the agent account
+`0.0.10455772` to the gateway account `0.0.10457565`, with Blocky402's
+`0.0.7162784` paying the fee. One was $0.036 after a wallet-signed human
+approval, one was $0.0102 cleared by policy alone. Transaction links are in
+`docs/bounty-evidence.md`.
 
 **Facilitator.** Blocky402 runs Hedera testnet at
 `https://api.testnet.blocky402.com` and mainnet at `https://api.blocky402.com`,
@@ -93,9 +100,8 @@ five minutes, state the bounty explicitly.
 https://github.com/hedera-dev/x402-inference-pay-per-request-poc ,
 https://blocky402.com/
 
-**Confidence.** High on protocol correctness (real packages, verified against
-their type definitions). Medium on live settlement until run with a funded
-testnet account.
+**Confidence.** High. Real packages, and live settlement through Blocky402
+demonstrated on Hedera testnet.
 
 ---
 

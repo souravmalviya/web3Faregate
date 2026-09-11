@@ -109,9 +109,11 @@ startup from the environment, and it travels:
 - The dashboard renders mode chips on the top bar and a pill on every receipt
   and data card.
 
-A live provider that fails throws a `DataProviderError`; the request is marked
-`failed` and the agent is told its payment stands. It is never handed
-simulated data in place of the real answer it paid for.
+A live provider that fails throws a `DataProviderError`. The gateway answers
+`502`, which stops the x402 middleware from settling, so nothing is charged;
+the reserved fare is released and the request is marked `failed`, to be
+collected again later. The agent is never handed simulated data in place of
+the real answer.
 
 ## Identity
 

@@ -299,8 +299,12 @@ paths:
             Refused at the gate: not authorised, revoked, over budget, or already
             fulfilled. From the gateway itself the body is `{ error: { code, message } }`;
             from the x402 middleware in live payment mode it is `{ error: "message" }`.
+        '409':
+          description: The same request is already being collected by another call.
         '502':
-          description: Payment was taken but the data provider failed. The request is marked failed.
+          description: |
+            The data provider failed. The payment is not settled, so nothing is
+            charged, and the request can be collected again.
 
   /events:
     get:

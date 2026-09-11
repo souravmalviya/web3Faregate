@@ -234,7 +234,8 @@ npm run dev:api
 npm run dev:web
 # terminal 3: the agent asks, the dashboard stops it for approval, you approve
 npm run agent
-# revoke the agent in the dashboard, then hand it its own approved quote
+# revoke the agent onchain, then hand it an approved quote it has not collected
+npm run ens:revoke -- research.agents.faregate.eth
 npm run agent -- --agent research.agents.faregate.eth --request <id>
 #   ✗ Refused at the gate: This agent passport has been revoked by its owner.
 #     The agent offered to pay and was still turned away.
@@ -243,7 +244,8 @@ npm run agent -- --agent research.agents.faregate.eth --request <id>
 ## Tests
 
 ```bash
-npm test          # 113 tests: policy engine, pricing, signed actions, store persistence, rate limiting, AI grounding, data fan-out, HTTP surface
+npm test          # 124 tests: policy engine, pricing, signed actions, store persistence, rate limiting, AI grounding, data fan-out, identity fail-closed, HTTP surface
+npm run e2e:live -- --yes   # live, testnet: real Hedera payments, Graph data, AI, ENS revoke and restore
 npm run typecheck
 npm run lint      # ESLint on the dashboard
 npm run build

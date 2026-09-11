@@ -79,7 +79,7 @@ collection, not at quote.
 
 | Sponsor | Integration | Status |
 |---|---|---|
-| Hedera | x402-gated data route, per-query USDC pricing, agent that pays, audit trail | Implemented and tested; the live 402 challenge from Blocky402 is verified; settlement needs testnet USDC in the agent account |
+| Hedera | x402-gated data route, per-query USDC pricing, agent that pays, audit trail | Live: settled x402 payments on Hedera testnet through Blocky402, 2026-09-11 |
 | The Graph (AI) | Sole data source; NL interpretation; grounded analysis | Live, verified 2026-09-10 |
 | The Graph (Composability) | One Messari-standard document fanned out across protocols | Live across Aave v3, Compound v3 and Spark |
 | ENS | ENSv2 passports, live resolution, onchain revocation, fail closed | Live on Sepolia: `faregate.eth` and two passports registered 2026-09-10 and resolved live |
@@ -130,8 +130,8 @@ Scripted at 3:30 in `docs/DEMO_SCRIPT.md`; runbook in `DEMO.md`.
 
 - State is a local snapshot file; one gateway, one machine.
 - Signatures prove who acted, not that they were entitled to.
-- Live x402 settlement is verified up to the 402 challenge from Blocky402; a
-  settled payment needs testnet USDC in the agent account.
+- Payments run on Hedera testnet. Mainnet needs funded accounts and
+  Blocky402's mainnet host.
 - Graph documents target the Messari lending schema only.
 - ENSv2 is beta and its interfaces may change.
 
@@ -181,9 +181,11 @@ The audit trail records `signed: true` and the address.
 Hedera transfer before the handler runs and settles it after; the receipt
 records the transaction id. In simulated mode the receipt says `simulated`.
 
-**Payment succeeds but retrieval fails?** The request is marked failed, the
-agent is told its payment stands, and it is never handed simulated data in
-place of the real answer.
+**Payment is signed but retrieval fails?** The gateway answers with an error,
+so the x402 middleware never settles the payment and nothing is charged. The
+reserved fare is released, the request is marked failed and can be collected
+again, and the agent is never handed simulated data in place of the real
+answer.
 
 **What happens when the agent is revoked?** Its next submission is refused;
 an approved quote it already holds is refused at the gate; the audit trail
@@ -240,8 +242,9 @@ Read in this order:
 1. `apps/api/src/human-auth.ts` and `packages/shared/src/actions.ts`. Who acted.
 2. `apps/api/src/payment/x402.ts`. The three `reevaluate` calls and why the
    hook runs before the price.
-3. `apps/api/src/routes/data.ts`. Spend before serve; fail loudly; analysis
-   never blocks delivery.
+3. `apps/api/src/routes/data.ts`. Reserve the fare, release it if the data
+   does not arrive; one collection at a time; fail loudly; analysis never
+   blocks delivery.
 4. `apps/api/src/identity/service.ts`. The fail-closed table.
 5. `apps/api/src/ai/provider.ts`. `groundAnalysis`.
 6. `apps/api/src/data/provider.ts`. One document, many protocols.

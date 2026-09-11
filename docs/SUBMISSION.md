@@ -1,8 +1,7 @@
 # ETHGlobal submission text
 
-Paste-ready text for the ETHGlobal project page. Update the line marked
-`[check]` and the links before submitting, so nothing is claimed that did not
-happen.
+Paste-ready text for the ETHGlobal project page. Add the demo video link
+before submitting. Every claim below was demonstrated live on testnet.
 
 ---
 
@@ -61,8 +60,8 @@ path:
 5. **Payment.** The data route is x402-gated on Hedera testnet. The gateway
    answers 402 with the exact price in atomic USDC units, the agent signs the
    transfer, and the facilitator verifies and settles it before any data is
-   released. `[check]` A real settlement is recorded on HashScan; if the demo
-   ran in simulated payment mode, say so here.
+   released. If the gateway cannot deliver the data, the payment is never
+   settled.
 6. **Data.** One query document, written once against the Messari
    standardized lending schema, fans out across Aave v3, Compound v3 and Spark
    on The Graph. Adding a protocol is one environment entry.
@@ -127,7 +126,8 @@ the Sepolia registrar in its free MockUSDC.
 - Demo video: `[add the link]`
 - ENS passport records on Sepolia: https://sepolia.etherscan.io/tx/0x1bb5f46d0fbeec04e896318a365b58719e224a45d837df2153abc4fd610e055a
 - ENS resolver on Sepolia: https://sepolia.etherscan.io/address/0xc305b40688D41bf05635Ab6cbc1ec0cb7FF18862
-- Hedera payment: `[add the HashScan link for the settled transaction]`
+- Hedera x402 payment, human-approved: https://hashscan.io/testnet/transaction/1789099682.370377941
+- Hedera x402 payment, cleared by policy alone: https://hashscan.io/testnet/transaction/1789099697.505301987
 
 ## Sponsor tracks to select
 

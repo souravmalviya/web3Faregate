@@ -24,6 +24,7 @@
     "ens:setup": "node scripts/ens/setup.ts",
     "ens:revoke": "node scripts/ens/passport.ts revoke --send --name",
     "ens:restore": "node scripts/ens/setup.ts --send",
+    "e2e:live": "node scripts/e2e/live.ts",
     "hedera:usdc": "node scripts/hedera/usdc.ts",
     "hedera:create-gateway": "node scripts/hedera/create-gateway.ts",
     "reset": "node -e \"require('fs').rmSync('data/faregate-state.json',{force:true});console.log('gateway state cleared')\""

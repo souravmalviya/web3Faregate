@@ -172,6 +172,21 @@ function errorMessage(body: ErrorResponse, fallback: string): string {
   return body.error?.message ?? fallback;
 }
 
+/**
+ * The settlement the x402 middleware reports in PAYMENT-RESPONSE. In live mode
+ * the gateway writes its body before settlement, so the Hedera transaction id
+ * arrives here rather than in the body.
+ */
+function settlementFrom(response: Response): { transaction?: string; success?: boolean } | null {
+  const raw = response.headers.get('payment-response');
+  if (!raw) return null;
+  try {
+    return JSON.parse(Buffer.from(raw, 'base64').toString('utf8')) as { transaction?: string; success?: boolean };
+  } catch {
+    return null;
+  }
+}
+
 // --- gateway calls -------------------------------------------------------
 
 async function getJson<T>(url: string): Promise<{ status: number; body: T }> {
@@ -298,12 +313,18 @@ async function main(): Promise<number> {
   );
   info('charged', `$${payload.budget.chargedUsd}`);
   info('spent today', `$${payload.budget.spentTodayUsd}`);
+  const settlement = settlementFrom(dataResponse);
+  const txId = settlement?.transaction || payload.payment.txHash;
+  const simulatedPayment = payload.payment.verifiedBy === 'simulated';
   info(
     'payment',
-    payload.payment.verifiedBy === 'simulated'
+    simulatedPayment
       ? `${YELLOW}simulated receipt${RESET}`
-      : `${GREEN}${payload.payment.txHash || 'settling'}${RESET} via ${payload.payment.verifiedBy}`,
+      : `${GREEN}${txId || 'settling'}${RESET} via ${payload.payment.verifiedBy}`,
   );
+  if (!simulatedPayment && txId && NETWORK.startsWith('hedera:')) {
+    info('hashscan', `https://hashscan.io/${NETWORK.slice('hedera:'.length)}/transaction/${encodeURIComponent(txId)}`);
+  }
 
   if (payload.result.analysis) {
     console.log(`\n${BOLD}Analysis${RESET}`);

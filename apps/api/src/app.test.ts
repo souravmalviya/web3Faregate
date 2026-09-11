@@ -18,7 +18,7 @@ import { buildActionMessage, canonicalDigest, type HumanAction } from '@faregate
 import { RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
 import { createApp } from './app.ts';
 import type { AppConfig } from './config.ts';
-import { SimulatedDataProvider } from './data/provider.ts';
+import { DataProviderError, SimulatedDataProvider, type DataProvider } from './data/provider.ts';
 import { LocalIdentityService, type IdentityService } from './identity/service.ts';
 import { GatewayStore, seedDemoData } from './store.ts';
 
@@ -68,13 +68,14 @@ async function boot(
   overrides: Partial<AppConfig> = {},
   identityFor: (store: GatewayStore) => IdentityService = (store) => new LocalIdentityService(store),
   aiProvider: AIProvider = new RuleBasedAIProvider(),
+  dataProvider: DataProvider = new SimulatedDataProvider(),
 ): Promise<Harness> {
   const store = new GatewayStore();
   seedDemoData(store, new Date('2026-09-10T00:00:00.000Z'));
   const app = createApp({
     config: { ...simulatedConfig(), ...overrides },
     store,
-    dataProvider: new SimulatedDataProvider(),
+    dataProvider,
     aiProvider,
     identity: identityFor(store),
     now: () => new Date('2026-09-10T12:00:00.000Z'),
@@ -756,6 +757,67 @@ test('creating an agent that already exists, or with an empty scope, is refused'
     });
     assert.equal(badId.status, 400);
     assert.equal(badId.body.error.code, 'invalid_agent_id');
+  } finally {
+    await h.close();
+  }
+});
+
+// --- collection edge cases ---------------------------------------------------
+
+async function spentToday(h: Harness, agentId: string): Promise<number> {
+  const { body } = await h.json('/agents');
+  return body.agents.find((a: any) => a.id === agentId).spentTodayUsd;
+}
+
+test('a failed data retrieval charges nothing and the request can be collected again', async () => {
+  const down: DataProvider = {
+    name: 'the-graph',
+    describe: () => 'always fails',
+    fetch: async () => {
+      throw new DataProviderError('gateway_error', 'The Graph is down in this test.');
+    },
+  };
+  const h = await boot({}, undefined, undefined, down);
+  try {
+    const created = await submit(h, TRIAL, `balance of ${SUBJECT} today`);
+    assert.equal(created.body.request.status, 'payment_required');
+    const id = created.body.request.id;
+
+    const first = await h.json(`/data/${id}`);
+    assert.equal(first.status, 502);
+    assert.equal(first.body.error.charged, false);
+    assert.equal(await spentToday(h, TRIAL), 0);
+    assert.equal((await h.json(`/requests/${id}`)).body.request.status, 'failed');
+
+    // Not refused as already fulfilled: the agent can try again later.
+    const second = await h.json(`/data/${id}`);
+    assert.equal(second.status, 502);
+    assert.equal(await spentToday(h, TRIAL), 0);
+  } finally {
+    await h.close();
+  }
+});
+
+test('two concurrent collections of one request are served and charged once', async () => {
+  class SlowProvider extends SimulatedDataProvider {
+    override async fetch(query: Parameters<SimulatedDataProvider['fetch']>[0]) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return super.fetch(query);
+    }
+  }
+  const h = await boot({}, undefined, undefined, new SlowProvider());
+  try {
+    const created = await submit(h, TRIAL, `balance of ${SUBJECT} today`);
+    const id = created.body.request.id;
+
+    const [a, b] = await Promise.all([h.json(`/data/${id}`), h.json(`/data/${id}`)]);
+    assert.deepEqual([a.status, b.status].sort(), [200, 409]);
+    assert.equal(await spentToday(h, TRIAL), created.body.request.estimatedCostUsd);
+
+    // Once fulfilled, a later attempt is refused and charged nothing more.
+    const later = await h.json(`/data/${id}`);
+    assert.equal(later.status, 403);
+    assert.equal(await spentToday(h, TRIAL), created.body.request.estimatedCostUsd);
   } finally {
     await h.close();
   }

@@ -9,7 +9,7 @@
     "start": "node src/server.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test src/app.test.ts src/config.test.ts src/store.test.ts src/rate-limit.test.ts src/ai/provider.test.ts src/data/provider.test.ts"
+    "test": "node --test src/app.test.ts src/config.test.ts src/store.test.ts src/rate-limit.test.ts src/ai/provider.test.ts src/data/provider.test.ts src/identity/service.test.ts"
   },
   "dependencies": {
     "@faregate/shared": "*",

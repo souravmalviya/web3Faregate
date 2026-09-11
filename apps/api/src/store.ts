@@ -183,6 +183,21 @@ export class GatewayStore {
     return next;
   }
 
+  /**
+   * Gives back spend reserved for a collection that never delivered data, for
+   * example when the data provider failed or the facilitator did not settle.
+   * Pass the same `at` the spend was recorded with. Never goes below zero.
+   */
+  releaseSpend(agentId: AgentId, micros: number, at: Date = new Date()): number {
+    const key = `${agentId}|${utcDayKey(at)}`;
+    const current = this.spend.get(key) ?? 0;
+    if (micros <= 0 || current === 0) return current;
+    const next = Math.max(0, current - Math.floor(micros));
+    this.spend.set(key, next);
+    this.markDirty();
+    return next;
+  }
+
   // --- replay protection -------------------------------------------------
 
   /**

@@ -2,13 +2,20 @@
  * The paid data route.
  *
  * This is the only place in Faregate where onchain data leaves the gateway. In
- * live mode the x402 middleware sits in front of it and this handler only runs
- * once a payment has been verified. In simulated mode there is no middleware,
- * so the handler issues a receipt explicitly marked as simulated.
+ * live mode the x402 middleware sits in front of it: it verifies the payment
+ * before this handler runs, holds the response back, and settles only when the
+ * handler answered with a success status. In simulated mode there is no
+ * middleware, so the handler issues a receipt explicitly marked as simulated.
  *
  * Either way the handler re-checks policy itself. Defence in depth: if the
  * middleware were ever misconfigured or mounted on the wrong path, an
  * unauthorised caller would still be refused here rather than served.
+ *
+ * Money follows the data. The fare is reserved against the agent's daily budget
+ * before the slow work starts, so concurrent requests cannot overspend a limit,
+ * and it is released again whenever the data does not reach the agent: when
+ * the data provider fails (the error status stops settlement) or when the
+ * facilitator does not settle.
  */
 
 import type { Request, Response, Router } from 'express';
@@ -39,9 +46,8 @@ const SETTLEMENT_HEADER = 'PAYMENT-RESPONSE';
 /**
  * Reads the settlement header the middleware writes after the handler returns.
  *
- * The header carries base64 JSON. A malformed or missing header is not an error
- * worth failing the request over, because the data was already served; it is
- * recorded as an unverified receipt so the audit trail stays truthful.
+ * The header carries base64 JSON. A malformed or missing header counts as not
+ * settled.
  */
 function decodeSettlement(raw: unknown): Record<string, unknown> | null {
   if (typeof raw !== 'string' || raw.length === 0) return null;
@@ -56,17 +62,33 @@ export function createDataRouter(deps: DataRouteDeps): Router {
   const { config, store, dataProvider, aiProvider, identity } = deps;
   const now = deps.now ?? (() => new Date());
   const gateDeps: PaymentGateDeps = { config, store, identity, now };
+  const live = config.payment.mode === 'live';
+
+  // Requests being collected right now. Two concurrent collections of one
+  // request could otherwise both pass the policy check before either finished.
+  // The second is refused, and because its status is an error the middleware
+  // never settles its payment.
+  const inFlight = new Set<string>();
 
   const router = express.Router();
 
   // Express 4 does not route a rejected promise to the error handler, so the
-  // async body lives in `handle` and its rejection is forwarded explicitly.
+  // async body lives in `collect` and its rejection is forwarded explicitly.
   router.get('/data/:requestId', (req: Request, res: Response, next) => {
-    handle(req, res).catch(next);
+    const requestId = String(req.params.requestId);
+    if (inFlight.has(requestId)) {
+      res.status(409).json({
+        error: { code: 'collection_in_progress', message: 'This request is already being collected.' },
+      });
+      return;
+    }
+    inFlight.add(requestId);
+    collect(requestId, res)
+      .catch(next)
+      .finally(() => inFlight.delete(requestId));
   });
 
-  async function handle(req: Request, res: Response): Promise<void> {
-    const requestId = String(req.params.requestId);
+  async function collect(requestId: string, res: Response): Promise<void> {
     const at = now();
 
     // Defence in depth. In live mode the middleware already ran this check
@@ -96,15 +118,17 @@ export function createDataRouter(deps: DataRouteDeps): Router {
       return void res.status(404).json({ error: { code: 'request_not_found', message: 'No such request.' } });
     }
 
-    // Record spend before serving. The payment is verified by this point, and
-    // recording first means a crash mid-response cannot hand out free data.
+    // Reserve the fare before any slow work, so concurrent requests from the
+    // same agent cannot overspend its daily limit. Released below if the data
+    // never reaches the agent.
     const spentAfter = store.recordSpend(request.agentId, check.costMicros, at);
+    const release = (): void => {
+      store.releaseSpend(request.agentId, check.costMicros, at);
+    };
 
     let receipt: PaymentReceipt;
-    if (config.payment.mode === 'live') {
-      // The real receipt is completed on 'finish', once the middleware has
-      // settled and written its header. Until then it is recorded as verified
-      // by the facilitator but without a hash.
+    if (live) {
+      // Completed once the middleware has settled and written its header.
       receipt = {
         requestId,
         txHash: '',
@@ -117,28 +141,6 @@ export function createDataRouter(deps: DataRouteDeps): Router {
         verifiedAt: at.toISOString(),
         verifiedBy: 'facilitator',
       };
-      res.on('finish', () => {
-        const settlement = decodeSettlement(res.getHeader(SETTLEMENT_HEADER));
-        const completed: PaymentReceipt = {
-          ...receipt,
-          txHash: typeof settlement?.transaction === 'string' ? settlement.transaction : '',
-          from: typeof settlement?.payer === 'string' ? settlement.payer : '',
-          settled: settlement?.success === true,
-        };
-        store.updateRequest(requestId, { payment: completed });
-        store.recordEvent({
-          type: 'payment.verified',
-          actor: 'system',
-          agentId: request.agentId,
-          requestId,
-          detail: {
-            txHash: completed.txHash,
-            settled: completed.settled,
-            network: completed.network,
-            amountMicros: check.costMicros,
-          },
-        });
-      });
     } else {
       receipt = {
         requestId,
@@ -174,31 +176,34 @@ export function createDataRouter(deps: DataRouteDeps): Router {
         fulfilledAt: now().toISOString(),
       };
     } catch (error) {
+      release();
       const failure =
         error instanceof DataProviderError
           ? { code: error.code, message: error.message }
           : { code: 'provider_error', message: 'The data provider failed.' };
 
-      store.updateRequest(requestId, { status: 'failed', error: failure.message, payment: receipt }, at);
+      store.updateRequest(requestId, { status: 'failed', error: failure.message }, at);
       store.recordEvent(
         {
           type: 'request.failed',
           actor: 'system',
           agentId: request.agentId,
           requestId,
-          detail: failure,
+          detail: { ...failure, charged: false },
         },
         at,
       );
 
-      // The agent paid and got nothing. Say so plainly rather than inventing a
-      // result, and tell it the payment stands so it can seek a refund offchain.
+      // The error status tells the middleware not to settle, so in live mode
+      // the agent's signed payment is never executed. Say so plainly.
       return void res.status(502).json({
         error: {
           code: failure.code,
           message: failure.message,
-          paymentSettled: receipt.settled,
-          note: 'Payment was taken but data retrieval failed. This request is marked failed.',
+          charged: false,
+          note: live
+            ? 'Data retrieval failed, so the payment was not settled and nothing was charged. The request can be collected again.'
+            : 'Data retrieval failed and nothing was charged. The request can be collected again.',
         },
       });
     }
@@ -227,6 +232,51 @@ export function createDataRouter(deps: DataRouteDeps): Router {
         ...result,
         analysisError: error instanceof Error ? error.message : 'Analysis failed.',
       };
+    }
+
+    if (live) {
+      // Settlement happens after this handler responds. If it fails, the agent
+      // receives a payment error instead of this body, so the request was not
+      // delivered: release the fare and mark it failed rather than fulfilled.
+      res.on('finish', () => {
+        const settlement = decodeSettlement(res.getHeader(SETTLEMENT_HEADER));
+        const settled = res.statusCode < 400 && settlement?.success === true;
+        const completed: PaymentReceipt = {
+          ...receipt,
+          txHash: typeof settlement?.transaction === 'string' ? settlement.transaction : '',
+          from: typeof settlement?.payer === 'string' ? settlement.payer : '',
+          settled,
+        };
+        if (settled) {
+          store.updateRequest(requestId, { payment: completed });
+          store.recordEvent({
+            type: 'payment.verified',
+            actor: 'system',
+            agentId: request.agentId,
+            requestId,
+            detail: {
+              txHash: completed.txHash,
+              settled: true,
+              network: completed.network,
+              amountMicros: check.costMicros,
+            },
+          });
+          return;
+        }
+        release();
+        store.updateRequest(requestId, {
+          status: 'failed',
+          payment: undefined,
+          error: 'The facilitator did not settle the payment, so the data was withheld and nothing was charged.',
+        });
+        store.recordEvent({
+          type: 'payment.rejected',
+          actor: 'system',
+          agentId: request.agentId,
+          requestId,
+          detail: { stage: 'settlement', responseStatus: res.statusCode },
+        });
+      });
     }
 
     store.updateRequest(requestId, { status: 'fulfilled', payment: receipt, result }, at);

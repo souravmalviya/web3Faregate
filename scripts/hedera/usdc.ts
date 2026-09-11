@@ -101,10 +101,10 @@ async function inspect(id: string): Promise<AccountReport> {
     autoSlots,
     associated: Boolean(usdc),
     usdc: usdc ? usdc.balance / 10 ** HEDERA_USDC_DECIMALS : 0,
-    // Unlimited slots (-1) always accept a new token. A positive count may
-    // already be used up, which the mirror node does not report, so only an
-    // explicit association counts as certain.
-    canReceiveUsdc: Boolean(usdc) || autoSlots === -1,
+    // Only an explicit association counts. Unlimited slots (-1) accept a
+    // wallet transfer, but the Circle faucet skips accounts without an explicit
+    // association, and a positive slot count may already be used up.
+    canReceiveUsdc: Boolean(usdc),
   };
 }
 
@@ -175,8 +175,11 @@ async function associate(): Promise<void> {
     return;
   }
   if (report.autoSlots === -1) {
-    console.log('\nUnlimited automatic associations. USDC will associate on first receipt; nothing to do.');
-    return;
+    // Unlimited slots accept a transfer from a wallet, but Circle's testnet
+    // faucet only delivers to accounts with an explicit USDC association: on
+    // 2026-09-11 every account it had paid was associated manually beforehand,
+    // and requests for an auto-association-only account were never delivered.
+    console.log('\nUnlimited automatic associations, but the Circle faucet needs an explicit association. Associating.');
   }
 
   const rawKey = env(keyVar);

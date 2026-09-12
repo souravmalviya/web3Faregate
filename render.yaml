@@ -1,5 +1,11 @@
 # Render blueprint for the Faregate gateway. See docs/DEPLOY.md.
 #
+# Runs on Render's free instance type: no card, no charge. A free instance
+# sleeps after 15 minutes without traffic and wakes on the next request, and
+# its disk is wiped on every deploy and wake, so the snapshot file is a cache
+# of the queue, not a record. With ENS live the passports come from Sepolia,
+# so nothing that matters is lost.
+#
 # The gateway holds no private keys. Only the values marked sync: false are
 # entered in the Render dashboard, and none of them is a key that can move
 # funds: the agent's Hedera key and the ENS owner key stay on the operator's
@@ -9,20 +15,44 @@ services:
     name: faregate-gateway
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build --workspace @faregate/shared
+    branch: main
+    # Only the gateway and the shared package are installed; the dashboard and
+    # its dependencies are not needed here. --include=dev keeps tsc available
+    # for the shared build whatever NODE_ENV the host sets.
+    buildCommand: npm ci --include=dev --workspace @faregate/shared --workspace @faregate/api && npm run build --workspace @faregate/shared
     startCommand: node apps/api/src/server.ts
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: "24"
+      # Render fronts the service with a proxy; without this every caller
+      # would share the proxy's address and one rate limit.
       - key: FAREGATE_TRUST_PROXY
+        value: "true"
+      - key: FAREGATE_REQUIRE_SIGNED_ACTIONS
         value: "true"
       - key: FAREGATE_NETWORK
         value: hedera:testnet
+      - key: FAREGATE_ASSET
+        value: "0.0.429274"
       - key: ENS_RPC_URL
         value: https://ethereum-sepolia-rpc.publicnode.com
       - key: FAREGATE_PARENT_NAME
         value: agents.faregate.eth
+      - key: OPENROUTER_MODEL
+        value: openai/gpt-4.1-mini
+      # Tighter than the local defaults: the host is public, and a demo needs
+      # a few requests a minute, not sixty.
+      - key: FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE
+        value: "12"
+      - key: FAREGATE_RATE_LIMIT_ACTIONS_PER_MINUTE
+        value: "20"
+      # Hard cap on model calls an hour, whoever asks. Past it the rule-based
+      # parser answers, so the OpenRouter bill has a ceiling.
+      - key: FAREGATE_AI_CALLS_PER_HOUR
+        value: "200"
+      # Entered in the Render dashboard. The dashboard's public URL, the
+      # gateway's Hedera testnet account, and two spend-limited API keys.
       - key: FAREGATE_CORS_ORIGIN
         sync: false
       - key: FAREGATE_PAY_TO

@@ -77,8 +77,9 @@ export function Shell({ children }: { children: ReactNode }) {
         {error ? (
           <div className="mb-6">
             <Notice tone="stop">
-              Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. Start it with{' '}
-              <code className="font-mono">npm run dev:api</code>. Retrying every 2 seconds.
+              Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. Locally, start it with{' '}
+              <code className="font-mono">npm run dev:api</code>. A hosted gateway on a free plan can take a minute to
+              wake. Retrying every 2 seconds.
             </Notice>
           </div>
         ) : null}

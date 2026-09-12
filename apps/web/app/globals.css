@@ -1,82 +1,129 @@
 @import 'tailwindcss';
 
 /*
- * Faregate dashboard theme: a dark control room.
+ * Faregate console tokens. The reasoning is in docs/DESIGN.md.
  *
- * One violet-to-cyan accent carries the brand and primary actions. Emerald,
- * amber, rose and sky are reserved for request state, so a status never
- * competes with a control. Geist for text, Geist Mono for money and ids.
+ * Paper and ink: the console is a ledger of permissions and fares, so it reads
+ * like an official document. One accent, stamp blue, marks what can be acted
+ * on. Green, amber and red are kept for the gate's verdicts.
  */
-@theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, Consolas, monospace;
+:root {
+  --paper: #f3f0e8;
+  --sheet: #fbfaf6;
+  --sheet-2: #ece8dd;
+  --rule: #ddd7ca;
+  --rule-strong: #bfb7a5;
+  --ink: #1c1b18;
+  --ink-2: #4a463e;
+  --muted: #787164;
+
+  --brand: #2446a6;
+  --brand-ink: #1b3582;
+  --brand-tint: #e3e8f5;
+
+  --pass: #1e6a44;
+  --pass-tint: #e0eee5;
+  --hold: #95570a;
+  --hold-tint: #f5e9d0;
+  --stop: #b0261e;
+  --stop-tint: #f6e1dd;
 }
 
-:root {
-  color-scheme: dark;
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-sheet-2: var(--sheet-2);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-tint: var(--brand-tint);
+  --color-pass: var(--pass);
+  --color-pass-tint: var(--pass-tint);
+  --color-hold: var(--hold);
+  --color-hold-tint: var(--hold-tint);
+  --color-stop: var(--stop);
+  --color-stop-tint: var(--stop-tint);
+
+  --font-display: var(--font-barlow-semi), 'Arial Narrow', sans-serif;
+  --font-sans: var(--font-plex-sans), 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Consolas, monospace;
 }
 
 html {
-  background: #07080d;
+  background: var(--paper);
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
-  color: #e4e4e7;
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 15px;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex-sans), 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/*
- * The brand glow sits on its own fixed layer. A fixed body background would be
- * repainted on every scroll, which shows up as flicker in a screen recording.
- */
-.app-glow {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(1100px 520px at 12% -12%, rgb(124 58 237 / 0.2), transparent 60%),
-    radial-gradient(900px 480px at 96% -4%, rgb(34 211 238 / 0.12), transparent 60%);
-}
-
-/* A faint grid behind the hero, fading out as it goes down. */
-.bg-grid {
-  background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 20%, transparent 75%);
-}
-
-.text-gradient {
-  background: linear-gradient(90deg, #a78bfa, #22d3ee);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Digits line up in every money column. */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-.scroll-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 0.15) transparent;
+/* Labels, column heads and stamps: condensed signage capitals. */
+.label {
+  font-family: var(--font-barlow-semi), 'Arial Narrow', sans-serif;
+  font-weight: 600;
+  font-size: 11.5px;
+  line-height: 1.3;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
-::selection {
-  background: rgb(139 92 246 / 0.35);
+/* The perforation between an approval ticket and its stub. */
+.perforation {
+  width: 1px;
+  background-image: linear-gradient(to bottom, var(--rule-strong) 55%, transparent 0);
+  background-size: 1px 7px;
+  background-repeat: repeat-y;
+}
+
+/* A request that has just arrived is tinted briefly, so it is noticed without anything moving. */
+@keyframes arrive {
+  from {
+    background-color: var(--brand-tint);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.arrive {
+  animation: arrive 2.4s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast {
+  animation: toast-in 160ms ease-out;
 }
 
 :focus-visible {
-  outline: 2px solid #8b5cf6;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
+}
+
+::selection {
+  background: var(--brand-tint);
 }
 
 @media (prefers-reduced-motion: reduce) {

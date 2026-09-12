@@ -115,7 +115,7 @@ apps/agent      the demo agent, a real x402 client in its own process
 packages/shared domain model, pricing, policy engine (pure, tested)
 scripts/ens     one-command ENSv2 setup, onchain revoke and restore of passports
 scripts/hedera  create the gateway account, check and associate USDC
-docs/           ARCHITECTURE, DECISIONS, DEMO_SCRIPT, DEPLOY, SECURITY, SPONSOR_MATRIX, SUBMISSION, bounty evidence, ENS guide, OpenAPI
+docs/           ARCHITECTURE, DECISIONS, DESIGN, DEMO_SCRIPT, DEPLOY, SECURITY, SPONSOR_MATRIX, SUBMISSION, bounty evidence, ENS guide, OpenAPI
 ```
 
 ## Sponsor integrations

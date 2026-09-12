@@ -20,9 +20,9 @@ third. Keep both visible the whole time. Do not switch windows.
    npm run dev:api       # start the gateway again
    ```
 
-3. The top bar shows **Hedera x402, The Graph, AI and ENS**, each marked
-   **live**. If the agent account has no test USDC, see "No test USDC" at the
-   bottom first.
+3. The header readout shows **Pay, Data, AI and ENS** with green squares and
+   the word **Live**. If the agent account has no test USDC, see "No test USDC"
+   at the bottom first.
 4. The terminal on the right is open in the `faregate` folder.
 
 Read the quoted lines out loud. Pause where the audience needs to read.
@@ -37,7 +37,7 @@ Read the quoted lines out loud. Pause where the audience needs to read.
 
 ## 0:20 to 0:45  What Faregate is
 
-Point at the top bar.
+Point at the header readout, then the four figures under **Requests**.
 
 > Faregate is the gate between an agent and paid onchain data. Payment is x402
 > on Hedera, data is The Graph, identity is ENS, and an AI reads questions and
@@ -46,8 +46,9 @@ Point at the top bar.
 
 ## 0:45 to 1:10  The agent's passport is an ENS name
 
-Point at the Treasury Research Agent card: the **ENS passport** label and the
-limits.
+Point at **Treasury Research Agent** in the **Passports** list on the right: its
+ENS name and its limits. The **Passports** page shows the same passport with its
+**ENS** stamp.
 
 > This agent's passport is an ENS name on Sepolia,
 > research.agents.faregate.eth. Its limits are text records on that name: ten
@@ -66,7 +67,8 @@ npm run agent
 > This is a separate program speaking x402. It asks, in plain English, for a
 > month of activity on a wallet.
 
-The terminal shows the price, $0.036, and `awaiting_approval`.
+The terminal shows the price, $0.036, and `awaiting_approval`. In the console the
+request appears under **Needs your signature**, with the reason it needs you.
 
 > The AI turned the question into a query. The gateway priced it at 3.6 cents
 > and checked the rules. That is above my two-cent line, so it stopped and
@@ -74,16 +76,16 @@ The terminal shows the price, $0.036, and `awaiting_approval`.
 
 ## 1:40 to 2:10  I approve, the agent pays
 
-Dashboard: the request is at the top. Click **Approve**, then **Sign** in
-MetaMask.
+Console: on the ticket under **Needs your signature**, click **Approve**, then
+**Sign** in MetaMask.
 
 > I approve, and my wallet signs it, so there is proof it was me. Now the
 > agent pays, not me.
 
-Terminal: `Approved by a human`, then the payment. Dashboard: click **Details**
-on the request and point at the **Payment** panel and its **View on HashScan**
-button. The progress tracker on the card now reads Asked, Rules, Approval,
-Paid, Data, all green.
+Terminal: `Approved by a human`, then the payment and a `hashscan` link.
+Console: open the request in **All requests** and point at the **Fare** column
+and its transaction link. The route on the row is filled all the way to
+**Data**. The **Ledger** page lists the same fare.
 
 > The agent paid 3.6 cents in USDC on Hedera testnet, and here is the
 > transaction on HashScan.
@@ -119,9 +121,9 @@ Terminal:
 npm run agent
 ```
 
-The terminal says the gateway refused the request with `agent_revoked`. On the
-dashboard the new row reads **Access denied · agent revoked**, and the card
-turns red.
+The terminal says the gateway refused the request with `agent_revoked`. In the
+console the new row is stamped **Refused** with **Agent revoked**, its route stops
+in a red square at **Passport**, and the passport on the right shows **revoked**.
 
 > Same agent, same question. The gateway read the chain, saw the revocation,
 > and refused. The agent got nothing and paid nothing.
@@ -139,10 +141,11 @@ Stop recording.
 
 - **No test USDC in the agent account.** Before recording, change
   `FAREGATE_PAY_TO=0.0.10457565` to `FAREGATE_PAY_TO=` in `.env` and restart
-  the gateway. The top bar shows Hedera x402 as simulated. Say "payment is
+  the gateway. The header readout shows Pay as simulated. Say "payment is
   simulated in this recording" out loud.
 - **MetaMask does not pop up.** Click the MetaMask icon; the request may be
-  waiting there. Check that the dashboard shows Sepolia at the top right.
+  waiting there. Check that the console shows Sepolia under your address at the
+  top right.
 - **The agent stops waiting before you approve.** Run
   `npm run agent -- --wait 300` to give yourself five minutes.
 - **The revoke is slow.** Sepolia takes 10 to 30 seconds. Wait for

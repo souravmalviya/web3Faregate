@@ -1,119 +1,49 @@
 'use client';
 
-import type { RequestStatus } from '@faregate/shared';
-import { LoaderCircle } from 'lucide-react';
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { Check, Copy, LoaderCircle } from 'lucide-react';
+import { useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
-/** Request status to semantic tone. Kept in one place so every surface agrees. */
-export type Tone = 'pass' | 'hold' | 'stop' | 'info' | 'neutral' | 'brand';
+/*
+ * Console primitives. The reasoning behind each is in docs/DESIGN.md: paper and
+ * ink, one stamp-blue accent, and green, amber and red kept for verdicts.
+ */
 
-export function toneFor(status: RequestStatus): Tone {
-  switch (status) {
-    case 'fulfilled':
-    case 'paid':
-      return 'pass';
-    case 'awaiting_approval':
-    case 'pending':
-      return 'hold';
-    case 'rejected':
-    case 'failed':
-      return 'stop';
-    case 'approved':
-    case 'payment_required':
-      return 'info';
-    default:
-      return 'neutral';
-  }
-}
+export type Tone = 'pass' | 'hold' | 'stop' | 'brand' | 'neutral';
 
-export const STATUS_LABEL: Record<RequestStatus, string> = {
-  pending: 'Pending',
-  awaiting_approval: 'Awaiting approval',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  payment_required: 'Payment required',
-  paid: 'Paid',
-  fulfilled: 'Fulfilled',
-  failed: 'Failed',
+const STAMP_TONE: Record<Tone, string> = {
+  pass: 'border-pass/40 bg-pass-tint text-pass',
+  hold: 'border-hold/40 bg-hold-tint text-hold',
+  stop: 'border-stop/40 bg-stop-tint text-stop',
+  brand: 'border-brand/35 bg-brand-tint text-brand-ink',
+  neutral: 'border-rule-strong bg-sheet text-ink-2',
 };
 
-const BADGE_CLASS: Record<Tone, string> = {
-  pass: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
-  hold: 'border-amber-400/25 bg-amber-400/10 text-amber-300',
-  stop: 'border-rose-400/25 bg-rose-400/10 text-rose-300',
-  info: 'border-sky-400/25 bg-sky-400/10 text-sky-300',
-  neutral: 'border-white/10 bg-white/5 text-zinc-300',
-  brand: 'border-violet-400/30 bg-violet-400/10 text-violet-200',
-};
-
-const DOT_CLASS: Record<Tone, string> = {
-  pass: 'bg-emerald-400',
-  hold: 'bg-amber-400',
-  stop: 'bg-rose-400',
-  info: 'bg-sky-400',
-  neutral: 'bg-zinc-500',
-  brand: 'bg-violet-400',
-};
-
-/** Icon tiles: a tinted square that carries a tone. */
-export const ICON_TONE: Record<Tone, string> = {
-  pass: 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300',
-  hold: 'border-amber-400/25 bg-amber-400/10 text-amber-300',
-  stop: 'border-rose-400/25 bg-rose-400/10 text-rose-300',
-  info: 'border-sky-400/25 bg-sky-400/10 text-sky-300',
-  neutral: 'border-white/10 bg-white/5 text-zinc-300',
-  brand: 'border-violet-400/25 bg-violet-400/10 text-violet-200',
-};
-
-export function Badge({
-  tone = 'neutral',
-  dot = false,
-  pulse = false,
-  className = '',
-  children,
-}: {
-  tone?: Tone;
-  dot?: boolean;
-  pulse?: boolean;
-  className?: string;
-  children: ReactNode;
-}) {
+/** A verdict: square, bordered and uppercase, like a stamp on a ticket. */
+export function Stamp({ tone = 'neutral', title, children }: { tone?: Tone; title?: string; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-medium ${BADGE_CLASS[tone]} ${className}`}
+      title={title}
+      className={`inline-flex h-5 shrink-0 items-center whitespace-nowrap rounded-[2px] border px-1.5 font-display text-[11.5px] font-semibold uppercase leading-none tracking-[0.06em] ${STAMP_TONE[tone]}`}
     >
-      {dot ? (
-        <span className="relative flex h-1.5 w-1.5" aria-hidden>
-          {pulse ? (
-            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-70 ${DOT_CLASS[tone]}`} />
-          ) : null}
-          <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${DOT_CLASS[tone]}`} />
-        </span>
-      ) : null}
       {children}
     </span>
   );
 }
 
-/** The older name, kept so existing call sites read the same. */
-export const Pill = Badge;
-
-type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'ghost' | 'danger' | 'approve';
+type ButtonVariant = 'primary' | 'secondary' | 'approve' | 'danger' | 'quiet';
 type ButtonSize = 'sm' | 'md';
 
-const BUTTON_CLASS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-linear-to-r from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-500/25 hover:brightness-110',
-  secondary: 'border border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10',
-  quiet: 'border border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/10 hover:text-white',
-  ghost: 'text-zinc-400 hover:bg-white/5 hover:text-white',
-  danger: 'border border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20',
-  approve: 'bg-emerald-500 text-emerald-950 shadow-lg shadow-emerald-500/25 hover:bg-emerald-400',
+const BUTTON_VARIANT: Record<ButtonVariant, string> = {
+  primary: 'border border-ink bg-ink text-sheet hover:bg-[#35332d]',
+  secondary: 'border border-rule-strong bg-sheet text-ink hover:border-ink-2',
+  approve: 'border border-pass bg-pass text-white hover:bg-[#175637]',
+  danger: 'border border-stop/60 bg-sheet text-stop hover:border-stop hover:bg-stop hover:text-white',
+  quiet: 'border border-transparent text-ink-2 hover:bg-sheet-2 hover:text-ink',
 };
 
-const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-[12.5px]',
-  md: 'h-10 px-4 text-[13.5px]',
+const BUTTON_SIZE: Record<ButtonSize, string> = {
+  sm: 'h-7 px-2.5 text-[12.5px]',
+  md: 'h-[34px] px-3.5 text-[13.5px]',
 };
 
 export function Button({
@@ -135,75 +65,255 @@ export function Button({
     <button
       {...rest}
       disabled={disabled || loading}
-      className={`inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 ${SIZE_CLASS[size]} ${BUTTON_CLASS[variant]} ${className}`}
+      aria-busy={loading || undefined}
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[3px] font-medium transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-45 ${BUTTON_SIZE[size]} ${BUTTON_VARIANT[variant]} ${className}`}
     >
-      {loading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : icon}
+      {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden /> : icon}
       {children}
     </button>
   );
 }
 
-export function Card({ className = '', children }: { className?: string; children: ReactNode }) {
+/** Two gate posts and the arm between them. */
+export function LogoMark({ size = 20 }: { size?: number }) {
   return (
-    <div className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] ${className}`}>
+    <svg viewBox="0 0 20 20" width={size} height={size} aria-hidden>
+      <rect x="2" y="2" width="3" height="16" fill="var(--ink)" />
+      <rect x="15" y="2" width="3" height="16" fill="var(--ink)" />
+      <rect x="5" y="8.5" width="10" height="3" fill="var(--brand)" />
+    </svg>
+  );
+}
+
+export function PageHeader({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-5 border-b-2 border-ink pb-5">
+      <div className="max-w-[580px]">
+        <h1 className="font-display text-[30px] font-semibold leading-none text-ink">{title}</h1>
+        <p className="mt-2.5 text-[14px] leading-relaxed text-ink-2">{description}</p>
+      </div>
       {children}
     </div>
   );
 }
 
-export function Section({
-  icon,
+export function Figures({ children }: { children: ReactNode }) {
+  // A two-by-two grid on narrow screens, a single ruled row from `sm` up.
+  return <dl className="grid grid-cols-2 gap-y-4 sm:flex sm:divide-x sm:divide-rule">{children}</dl>;
+}
+
+export function Figure({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  detail?: ReactNode;
+  tone?: 'hold' | 'stop';
+}) {
+  const color = tone === 'hold' ? 'text-hold' : tone === 'stop' ? 'text-stop' : 'text-ink';
+  return (
+    <div className="sm:px-5 sm:first:pl-0 sm:last:pr-0">
+      <dt className="label">{label}</dt>
+      <dd className={`tnum mt-1.5 font-mono text-[22px] font-medium leading-none ${color}`}>{value}</dd>
+      {detail ? <dd className="mt-1.5 text-[12px] text-muted">{detail}</dd> : null}
+    </div>
+  );
+}
+
+export function SectionHeading({
+  id,
   title,
-  description,
-  aside,
+  meta,
   children,
 }: {
-  icon?: ReactNode;
+  id?: string;
   title: string;
-  description?: ReactNode;
-  aside?: ReactNode;
+  meta?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule pb-2">
+      <h2 id={id} className="font-display text-[17px] font-semibold text-ink">
+        {title}
+        {meta ? <span className="ml-2 font-sans text-[12.5px] font-normal text-muted">{meta}</span> : null}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+const NOTICE_TONE: Record<'stop' | 'hold' | 'brand', string> = {
+  stop: 'border-l-stop bg-stop-tint',
+  hold: 'border-l-hold bg-hold-tint',
+  brand: 'border-l-brand bg-brand-tint',
+};
+
+export function Notice({ tone, children }: { tone: 'stop' | 'hold' | 'brand'; children: ReactNode }) {
+  return (
+    <div
+      role={tone === 'stop' ? 'alert' : undefined}
+      className={`border-l-[3px] px-4 py-2.5 text-[13.5px] leading-relaxed text-ink ${NOTICE_TONE[tone]}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function Empty({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="py-8">
+      <p className="text-[14px] font-medium text-ink">{title}</p>
+      {children ? <p className="mt-1 max-w-[540px] text-[13.5px] leading-relaxed text-ink-2">{children}</p> : null}
+    </div>
+  );
+}
+
+export function SkeletonRows({ rows = 4 }: { rows?: number }) {
+  return (
+    <div aria-busy="true" aria-label="Loading" className="divide-y divide-rule">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="flex items-center gap-4 py-3.5">
+          <span className="h-3 w-14 animate-pulse bg-sheet-2" />
+          <span className="h-3 w-32 animate-pulse bg-sheet-2" />
+          <span className="h-3 flex-1 animate-pulse bg-sheet-2" />
+          <span className="h-3 w-16 animate-pulse bg-sheet-2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A value with a copy control that appears on hover or keyboard focus. */
+export function CopyText({
+  value,
+  children,
+  className = '',
+  wrap = false,
+}: {
+  value: string;
+  children?: ReactNode;
+  className?: string;
+  wrap?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className={`group inline-flex min-w-0 items-center gap-1 ${className}`}>
+      <span className={wrap ? 'break-words' : 'truncate'}>{children ?? value}</span>
+      <button
+        type="button"
+        onClick={async (event) => {
+          event.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          } catch {
+            // Clipboard access can be refused; the value is still selectable.
+          }
+        }}
+        aria-label={copied ? 'Copied' : `Copy ${value}`}
+        title={copied ? 'Copied' : 'Copy'}
+        className="shrink-0 rounded-[2px] p-0.5 text-muted opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        {copied ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
+      </button>
+    </span>
+  );
+}
+
+export function SpendMeter({ spent, limit }: { spent: number; limit: number }) {
+  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  const width = spent > 0 ? Math.max(pct, 1.5) : 0;
+  return (
+    <div className="mt-2">
+      <div className="h-1 w-full bg-sheet-2">
+        <div className={`h-full ${pct >= 90 ? 'bg-stop' : 'bg-ink'}`} style={{ width: `${width}%` }} />
+      </div>
+      <div className="tnum mt-1 font-mono text-[11.5px] text-muted">
+        {formatMoney(spent)} of {formatMoney(limit)} today
+      </div>
+    </div>
+  );
+}
+
+function formatMoney(value: number): string {
+  const cents = Math.round(value * 100);
+  return Math.abs(value * 100 - cents) < 1e-9 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
+}
+
+export function Tabs<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: Array<{ value: T; label: string; count?: number }>;
+  value: T;
+  onChange: (next: T) => void;
+  label: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} className="flex flex-wrap items-center gap-x-5 border-b border-rule">
+      {options.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(option.value)}
+            className={`-mb-px flex items-center gap-1.5 border-b-2 pb-2 pt-1 text-[13.5px] transition-colors ${
+              active ? 'border-ink font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink'
+            }`}
+          >
+            {option.label}
+            {option.count !== undefined ? (
+              <span className="tnum font-mono text-[11.5px] text-muted">{option.count}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export const INPUT =
+  'w-full rounded-[3px] border border-rule-strong bg-sheet px-2.5 text-[13.5px] text-ink placeholder:text-muted focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15 aria-[invalid=true]:border-stop';
+
+export function Field({
+  label,
+  hint,
+  error,
+  className = '',
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  error?: string | null;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {icon ? (
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-violet-300">
-              {icon}
-            </span>
-          ) : null}
-          <div>
-            <h2 className="text-[17px] font-semibold tracking-tight text-white">{title}</h2>
-            {description ? <p className="text-[13px] text-zinc-400">{description}</p> : null}
-          </div>
-        </div>
-        {aside ? <div className="text-[13px] text-zinc-400">{aside}</div> : null}
-      </header>
+    <label className={`flex flex-col gap-1 ${className}`}>
+      <span className="label">{label}</span>
       {children}
-    </section>
-  );
-}
-
-export function Label({ children }: { children: ReactNode }) {
-  return <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">{children}</span>;
-}
-
-export function Kv({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <Label>{label}</Label>
-      <div className="tnum text-[14px] text-zinc-100">{children}</div>
-    </div>
-  );
-}
-
-export function Empty({ icon, title, children }: { icon?: ReactNode; title?: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-10 text-center">
-      {icon ? <span className="text-zinc-500">{icon}</span> : null}
-      {title ? <div className="text-[14px] font-medium text-zinc-200">{title}</div> : null}
-      <div className="max-w-md text-[13px] text-zinc-400">{children}</div>
-    </div>
+      {error ? (
+        <span className="text-[12px] text-stop">{error}</span>
+      ) : hint ? (
+        <span className="text-[12px] text-muted">{hint}</span>
+      ) : null}
+    </label>
   );
 }

@@ -209,5 +209,8 @@ export function timeAgo(iso: string, now: number = Date.now()): string {
 
 export function clockTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  // A 24-hour clock: shorter, and it sorts the way a ledger reads.
+  return Number.isNaN(d.getTime())
+    ? ''
+    : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
 }

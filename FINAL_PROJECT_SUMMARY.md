@@ -115,13 +115,13 @@ signatures prove who acted rather than who was entitled to.
 
 ## 8. Demo flow
 
-Scripted at 3:30 in `docs/DEMO_SCRIPT.md`; runbook in `DEMO.md`.
+Scripted at 3:35 in `docs/DEMO_SCRIPT.md`; runbook in `DEMO.md`.
 
 0. The agent's passport is `research.agents.faregate.eth` on Sepolia; its
    limits are the name's text records.
 1. Agent asks for 30 days of wallet activity. Gateway interprets, prices at
    $0.036, stops for a human.
-2. Human reads the decision and the plain-language explanation, approves.
+2. Human reads why it needs approval and approves with a wallet signature.
 3. Agent pays 36,000 atomic USDC units, collects data with provenance and a
    grounded summary.
 4. The owner revokes the passport onchain (`npm run ens:revoke`).

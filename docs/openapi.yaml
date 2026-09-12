@@ -58,8 +58,6 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/AgentWithPolicy'
-
-  /agents:
     post:
       tags: [human]
       summary: Create a local passport with its capability.

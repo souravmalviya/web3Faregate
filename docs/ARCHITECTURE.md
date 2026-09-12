@@ -28,7 +28,7 @@ app.ts
 ├── identity/
 │   ├── ens.ts         ENSv2 Sepolia passport resolver (reads only)
 │   └── service.ts     ENS-first identity, fail closed under the parent name
-├── ai/provider.ts     interpret / explain / analyze; OpenRouter or rule-based; grounding check
+├── ai/provider.ts     interpret / explain / analyze; OpenRouter or rule-based; grounding check; hourly call budget
 ├── data/provider.ts   The Graph (Messari-standard documents, multi-protocol fan-out) or simulated
 ├── payment/x402.ts    x402 resource server, dynamic per-request price, pre-payment policy hook
 └── routes/data.ts     the only route that returns data
@@ -106,8 +106,8 @@ startup from the environment, and it travels:
 - `/health` lists modes and the reason each simulated one is simulated.
 - Every `PaymentReceipt` carries `verifiedBy: facilitator | rpc | simulated`.
 - Every `DataProvenance` carries `simulated: boolean` and the source.
-- The dashboard renders mode chips on the top bar and a pill on every receipt
-  and data card.
+- The dashboard shows the four modes in its header readout and stamps every
+  receipt and data view as live or simulated.
 
 A live provider that fails throws a `DataProviderError`. The gateway answers
 `502`, which stops the x402 middleware from settling, so nothing is charged;
@@ -169,12 +169,17 @@ implements the same interface with no model. Both feed `groundAnalysis`, which
 strips any `0x` hex token in the summary that does not appear in the serialised
 data and records what it removed.
 
+`BudgetedAIProvider` wraps the live provider with a budget on model calls per
+rolling hour (`FAREGATE_AI_CALLS_PER_HOUR`), counted across every caller. Past
+the budget the rule-based provider answers and the gateway logs it once, so an
+open submission endpoint cannot be used to run up a model bill.
+
 ## The dashboard
 
 Next.js, client-rendered, polling the gateway every two seconds. It reads the
-injected wallet for an address and chain id and never sends a transaction. It
-is styled with the same tokens as the project's plan page and CLI so the three
-surfaces read as one product.
+injected wallet for an address and chain id and never sends a transaction. Its
+design system, a paper-and-ink console with stamps for verdicts and a transit
+line for each request's route, is documented in `docs/DESIGN.md`.
 
 ## The agent
 
@@ -196,8 +201,8 @@ Every request has an id, and `GET /requests/:id/events` returns its own
 timeline in order: received, evaluated, approval requested, approved (by whom,
 signed or not), payment required, payment verified or rejected (with stage),
 data retrieved (with provenance), analysis completed (with grounding
-warnings), fulfilled or failed. The dashboard renders this under each request
-as "What happened".
+warnings), fulfilled or failed. The dashboard renders this under each open
+request as its Timeline.
 
 ## What is deliberately absent
 

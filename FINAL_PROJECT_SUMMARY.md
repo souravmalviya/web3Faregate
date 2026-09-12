@@ -95,7 +95,9 @@ the gateway. Defences, each traceable to a file:
 
 - Deterministic server-side policy (`packages/shared/src/policy.ts`).
 - Wallet-signed human actions, verified server-side (`apps/api/src/human-auth.ts`).
-- Per-passport and per-caller rate limits (`apps/api/src/rate-limit.ts`).
+- Per-passport and per-caller rate limits (`apps/api/src/rate-limit.ts`), and
+  an hourly budget on model calls across every caller (`BudgetedAIProvider`
+  in `apps/api/src/ai/provider.ts`).
 - Integer micro-USD; no float drift on limits (`pricing.ts`).
 - Prices from the stored request, never the caller (`payment/x402.ts`).
 - Policy re-evaluated at quote, payment and release; revocation refused at the
@@ -137,9 +139,10 @@ Scripted at 3:30 in `docs/DEMO_SCRIPT.md`; runbook in `DEMO.md`.
 
 ## 10. Future roadmap
 
-Signed approvals; HCS anchoring of settled payments; persistence and
-multi-tenant passports; liveness-gated spend tiers; streamed settlement for
-subscriptions; a Privy organisation-wallet mode for teams.
+Owner binding, so only the wallet that created an agent may approve for it;
+HCS anchoring of settled payments; shared persistent state and multi-tenant
+passports; liveness-gated spend tiers; streamed settlement for subscriptions;
+a Privy organisation-wallet mode for teams.
 
 ## 11. Bounty mapping
 
@@ -212,8 +215,10 @@ holds no keys and no funds.
 Graph gateway returns what the subgraph indexed; the owner's wallet is the
 owner's.
 
-**What would change for production?** Signed approvals, persisted state,
-rate limiting, HCS anchoring, and a hosted facilitator with an SLA.
+**What would change for production?** Owner binding on approvals,
+authenticated reads, shared persistent state, HCS anchoring, and a
+facilitator with an SLA. Signed actions, rate limits and the model-call
+budget are already in.
 
 **If a sponsor service is down?** Identity fails closed for ENS passports.
 Data fails loudly. Payment cannot be verified, so no data is released.

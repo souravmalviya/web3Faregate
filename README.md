@@ -148,7 +148,9 @@ per-bounty breakdown with file references and honest status is in
 - Every human action (approve, reject, revoke, set policy, create agent) is
   signed by the acting wallet and verified by the gateway: signer must match,
   ten-minute validity, payload digest, single use.
-- Agents are rate-limited per passport; humans per caller.
+- Agents are rate-limited per passport; humans per caller. Model calls are
+  capped per hour across everyone, so an open gateway cannot be made to run up
+  a model bill.
 - No custody, no keys in the gateway, no transaction ever sent by the gateway.
 
 Threat model and limits: [SECURITY.md](SECURITY.md). Why it is built this way:
@@ -188,7 +190,7 @@ Turn subsystems live one at a time in `.env`:
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8402` | Gateway port |
-| `FAREGATE_CORS_ORIGIN` | `http://localhost:3000` | Dashboard origin |
+| `FAREGATE_CORS_ORIGIN` | `http://localhost:3000` | Dashboard origin, or several comma-separated |
 | `FAREGATE_REQUIRE_SIGNED_ACTIONS` | `true` | Human actions must carry a verified wallet signature |
 | `FAREGATE_STATE_FILE` | `data/faregate-state.json` | Snapshot file; `off` for memory only |
 | `FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Submissions per agent per minute |
@@ -204,6 +206,7 @@ Turn subsystems live one at a time in `.env`:
 | `GRAPH_SUBGRAPHS` | Aave v3, Compound v3, Spark on Ethereum | `protocol=subgraphId` pairs on the Messari standard schema |
 | `OPENROUTER_API_KEY` | unset (AI rule-based) | OpenRouter key |
 | `OPENROUTER_MODEL` | `openai/gpt-4.1-mini` | Any OpenRouter model with structured outputs |
+| `FAREGATE_AI_CALLS_PER_HOUR` | `300` | Model calls allowed an hour across all callers; past it the rule-based parser answers |
 | `ENS_RPC_URL` | unset (passports local) | Sepolia RPC for ENSv2 resolution |
 | `FAREGATE_PARENT_NAME` | `agents.faregate.eth` | Parent name passports live under |
 | `ENS_UNIVERSAL_RESOLVER` | ENSv2 beta address | Override only if ENS redeploys |
@@ -257,6 +260,13 @@ lifecycle, idempotent replay, validation of untrusted structured queries, the
 daily limit across requests, spend recorded at collection rather than quote,
 revocation before and after approval, and the audit trail order.
 
+## Deploy, free
+
+The gateway runs on a free Render instance (`render.yaml`), the dashboard on
+Vercel's Hobby plan (`apps/web/vercel.json`), and the agent stays on your
+machine with the only key that can spend anything. Everything stays on test
+networks. Step by step in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Limitations
 
 Honest ones.
@@ -270,10 +280,12 @@ Honest ones.
   not publish it returns `schema_mismatch` rather than data.
 - ENSv2 is beta on Sepolia. The passport script dry-runs by default and cites
   the page each interface came from.
-- Live x402 settlement has been verified against the packages' type
-  definitions and the Hedera reference implementation, and end to end in
-  simulated mode. Settling against a funded testnet account is the operator's
-  step.
+- Live x402 settlement is demonstrated on Hedera testnet through Blocky402
+  ([docs/bounty-evidence.md](docs/bounty-evidence.md)). Mainnet is untested
+  and out of scope.
+- On free hosting the snapshot file is wiped whenever the instance sleeps or
+  redeploys, so the request queue, spend ledger and used signatures start
+  empty. ENS passports are unaffected.
 
 ## Future work
 

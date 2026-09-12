@@ -87,7 +87,7 @@ transaction ids line up and read as exact values.
 - Rules: 1px hairlines; a 2px ink rule under each page header.
 - Spacing steps: 4, 8, 12, 16, 20, 24, 32, 40px.
 - Layout: 1200px maximum width. The requests page uses an asymmetric
-  two-column grid: the working column, and a 320px reference rail.
+  two-column grid: the working column, and a 300px reference rail.
 
 ## 4. Components
 

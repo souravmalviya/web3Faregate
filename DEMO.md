@@ -59,17 +59,19 @@ Expected in terminal 1:
 [faregate] ens      simulated
 ```
 
-Expected at http://localhost:3000: the Faregate top bar with four mode chips,
-a notes panel explaining each simulated subsystem, an empty request queue, and
-two passports: **Treasury Research Agent** and **Trial Scout Agent**.
+Expected at http://localhost:3000: the header readout showing Pay, Data, AI
+and ENS as simulated, a notice explaining why each is simulated, an empty
+request list, and two passports in the rail on the right: **Treasury Research
+Agent** and **Trial Scout Agent**.
 
 ## The flow
 
 ### 0. Create an agent (optional, local mode only)
 
-With ENS simulated: dashboard **New agent**, keep the defaults (`ResearchBot`,
-$0.10 per query, approval above $0.02, $1.00 daily), **Create and sign**, sign
-in the wallet. The card appears as `researchbot.agents.faregate.eth`.
+With ENS simulated: **Passports** page, **New passport**, keep the defaults
+(`ResearchBot`, $0.10 per query, approval above $0.02, $1.00 daily), **Create
+and sign**, sign in the wallet. The passport appears in the list as
+`researchbot.agents.faregate.eth`.
 
 With ENS live, passports are ENS names and the dashboard does not create them.
 The two demo passports come from `npm run ens:setup -- --send` and show as
@@ -90,13 +92,13 @@ price         $0.036
 status        awaiting_approval
 ```
 
-then waits, printing the curl command that would approve it.
+then waits for a human, and says so.
 
 ### 2. A human approves
 
-Dashboard: the request appears at the top with **Awaiting approval** and the
-policy reason. Connect the wallet if not already, then **Approve** and sign
-the message the wallet shows.
+Dashboard: the request appears as a ticket under **Needs your signature**,
+with the reason it needs you and the fare on the stub. Connect the wallet if
+not already, then **Approve** and sign the message the wallet shows.
 
 Expected in the agent terminal within two seconds:
 
@@ -110,8 +112,9 @@ payment       simulated receipt                  (or: a Hedera transaction id)
 
 ### 3. Revoke and retry
 
-Local mode: dashboard **Revoke** on the research agent, then **Confirm
-revoke**, and sign. The card turns red with *Access revoked*.
+Local mode: **Passports** page, **Revoke** on the research agent, then
+**Confirm revoke**, and sign. The row is marked **revoked** with a red rule and
+*Access revoked*.
 
 ENS mode: revoke onchain with the owner's key, and wait for `confirmed`:
 
@@ -139,9 +142,10 @@ Expected:
   The agent offered to pay and was still turned away.
 ```
 
-The dashboard row shows **Refused at the gate** under its status, and the audit
-trail reads `request.approved` → `agent.revoked` → `payment.rejected`. A new
-request from the revoked agent shows **Access denied · agent revoked**.
+The dashboard row is stamped **Refused**, *Stopped at the gate*, and its route
+stops in a red square at **Fare**. The audit log reads Approved, Passport
+revoked, Refused at the gate. A new request from the revoked agent is stamped
+**Refused**, *Agent revoked*, with its route stopping at **Passport**.
 
 ### 4. Reset
 
@@ -169,7 +173,8 @@ live, reads them from the chain at startup.
 | `429 rate_limited` | An agent submitted too fast | Wait for the `Retry-After` seconds, or raise `FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE` |
 | Restart did not reset the demo | State persists in `data/faregate-state.json` | `npm run reset`, then restart |
 | Agent prints `Gateway is not reachable` | Same as above | Set `FAREGATE_GATEWAY_URL` if the gateway is not on `:8402` |
-| Agent waits forever | Nobody approved | Approve in the dashboard, or run the printed curl |
+| Agent waits forever | Nobody approved | Approve in the dashboard; `npm run agent -- --wait 300` gives you five minutes |
+| Requests say "Read by the rule-based parser" although a model key is set | The hourly model budget is used up, or OpenRouter is failing | Check the gateway log; wait, or raise `FAREGATE_AI_CALLS_PER_HOUR` |
 | `payment: simulated` although `FAREGATE_PAY_TO` is set | `.env` not at the repo root | The gateway loads `.env` from the repository root only |
 | `data: simulated` although a key is set | `GRAPH_SUBGRAPHS` missing | Both the key and at least one subgraph are needed |
 | Data request returns `502 schema_mismatch` | The pinned subgraph does not publish the Messari standard schema | Point `GRAPH_SUBGRAPHS` at one that does |

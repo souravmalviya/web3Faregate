@@ -30,12 +30,17 @@ logs/
 npm-debug.log*
 yarn-error.log*
 
-# editor and OS
+# editor, AI tooling and OS
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.claude/
+.vercel/
+
+# personal handover notes, never part of the repository
+CONTEXT.md
 
 # test output
 coverage/

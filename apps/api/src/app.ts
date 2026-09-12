@@ -146,8 +146,12 @@ export function createApp(deps: AppDeps): Express {
   const now = deps.now ?? (() => new Date());
 
   const app = express();
+  // The only query parameter the gateway reads is `?limit=`, so Node's plain
+  // parser will do; Express's default (qs) parses nested objects and arrays
+  // from untrusted input and carries its own advisories.
+  app.set('query parser', 'simple');
   app.use(express.json({ limit: '64kb' }));
-  app.use(cors({ origin: config.corsOrigin }));
+  app.use(cors({ origin: config.corsOrigins }));
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', 1);
 

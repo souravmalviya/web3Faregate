@@ -30,7 +30,7 @@ const TRIAL = 'trial.agents.faregate.eth';
 function simulatedConfig(): AppConfig {
   return {
     port: 0,
-    corsOrigin: 'http://localhost:3000',
+    corsOrigins: ['http://localhost:3000'],
     // Most tests exercise the flow without a wallet; the signature tests
     // below opt in explicitly.
     requireSignedActions: false,
@@ -46,7 +46,7 @@ function simulatedConfig(): AppConfig {
       reason: 'test',
     },
     data: { mode: 'simulated', graphApiKey: undefined, subgraphs: undefined, reason: 'test' },
-    ai: { mode: 'simulated', apiKey: undefined, model: 'openai/gpt-4.1-mini', reason: 'test' },
+    ai: { mode: 'simulated', apiKey: undefined, model: 'openai/gpt-4.1-mini', callsPerHour: 300, reason: 'test' },
     ens: {
       mode: 'simulated',
       rpcUrl: undefined,

@@ -43,6 +43,8 @@ export interface CreateAuditEvent {
 export interface StoreOptions {
   /** Snapshot file. Omit for a purely in-memory store, as the tests use. */
   file?: string;
+  /** Requests kept in memory. Past this, the oldest finished ones are dropped. */
+  requestCap?: number;
 }
 
 /** The on-disk shape. Versioned so a future migration has something to check. */
@@ -60,6 +62,24 @@ interface Snapshot {
 
 /** Audit events kept in memory. Older ones are dropped from the head, never edited. */
 const AUDIT_CAP = 10_000;
+
+/**
+ * Bounds on the other tables. Submission is open to any caller, so without
+ * them a flood of refused requests would grow memory and the snapshot file
+ * without limit. Entries dropped from the signature and idempotency tables
+ * are the oldest, which are long outside any validity window.
+ */
+const DEFAULT_REQUEST_CAP = 5_000;
+const NONCE_CAP = 50_000;
+const IDEMPOTENCY_CAP = 10_000;
+
+/** Drops the oldest entries of an insertion-ordered Set or Map until it fits `cap`. */
+function trimOldest(collection: Set<string> | Map<string, unknown>, cap: number): void {
+  for (const key of collection.keys()) {
+    if (collection.size <= cap) return;
+    collection.delete(key);
+  }
+}
 
 /** How long after a change the snapshot is written. Coalesces bursts of writes. */
 const SAVE_DELAY_MS = 50;
@@ -80,10 +100,12 @@ export class GatewayStore {
   private readonly idempotency = new Map<string, string>();
 
   private readonly file: string | null;
+  private readonly requestCap: number;
   private saveTimer: NodeJS.Timeout | null = null;
 
   constructor(options: StoreOptions = {}) {
     this.file = options.file ?? null;
+    this.requestCap = Math.max(1, Math.floor(options.requestCap ?? DEFAULT_REQUEST_CAP));
     if (this.file) this.load();
   }
 
@@ -144,8 +166,25 @@ export class GatewayStore {
 
   putRequest(request: AccessRequest): AccessRequest {
     this.requests.set(request.id, request);
+    this.trimRequests();
     this.markDirty();
     return request;
+  }
+
+  /**
+   * Keeps the request table within its cap. Finished requests go first, oldest
+   * first. A request still waiting on a human or on a payment is never
+   * dropped, so the cap can only ever forget history, not an open decision.
+   */
+  private trimRequests(): void {
+    if (this.requests.size <= this.requestCap) return;
+    const finished = [...this.requests.values()]
+      .filter((r) => r.status === 'fulfilled' || r.status === 'rejected' || r.status === 'failed')
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (const request of finished) {
+      if (this.requests.size <= this.requestCap) return;
+      this.requests.delete(request.id);
+    }
   }
 
   updateRequest(
@@ -210,6 +249,7 @@ export class GatewayStore {
   consumeNonce(nonce: string): boolean {
     if (this.usedNonces.has(nonce)) return false;
     this.usedNonces.add(nonce);
+    trimOldest(this.usedNonces, NONCE_CAP);
     this.markDirty();
     return true;
   }
@@ -225,6 +265,7 @@ export class GatewayStore {
 
   rememberIdempotent(key: string, requestId: string): void {
     this.idempotency.set(key, requestId);
+    trimOldest(this.idempotency, IDEMPOTENCY_CAP);
     this.markDirty();
   }
 
@@ -262,9 +303,14 @@ export class GatewayStore {
 
   // --- persistence -------------------------------------------------------
 
-  /** Where state is kept, for /health and the startup log. */
+  /**
+   * Where state is kept, for /health and the startup log. Only the last two
+   * path segments, so a hosted gateway does not publish its filesystem layout.
+   */
   describePersistence(): string {
-    return this.file ? `snapshot file ${this.file}` : 'memory only';
+    if (!this.file) return 'memory only';
+    const segments = this.file.split(/[\\/]/).filter(Boolean);
+    return `snapshot file ${segments.slice(-2).join('/')}`;
   }
 
   private markDirty(): void {

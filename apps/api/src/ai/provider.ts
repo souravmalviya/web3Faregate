@@ -32,6 +32,7 @@ import {
 } from '@faregate/shared';
 
 import { parsePrompt } from '../query-parser.ts';
+import { SlidingWindowLimiter } from '../rate-limit.ts';
 
 export interface InterpretResult {
   /** Untrusted proposal. Must be validated by `parseStructuredQuery`. */
@@ -387,4 +388,80 @@ function logModelError(stage: string, error: unknown): void {
   else if (error instanceof SyntaxError) reason = 'the model returned invalid JSON';
   else reason = error instanceof Error ? error.message : String(error);
   console.error(`[faregate] ai ${stage}: ${reason}; using the rule-based fallback`);
+}
+
+// --- budget ----------------------------------------------------------------
+
+export interface AIBudgetOptions {
+  /** Model calls allowed in any rolling hour. */
+  callsPerHour: number;
+  /** Injected so tests can move time. */
+  now?: () => Date;
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Caps how often the model is called.
+ *
+ * Request submission is open to any agent that can reach the gateway, and each
+ * accepted request may call the model up to three times. On a public host that
+ * is a bill anyone could run up. Past the budget every call is answered by the
+ * rule-based provider instead, so the product keeps working and the spending
+ * stops. Interpretations and analyses report the provider that answered.
+ */
+export class BudgetedAIProvider implements AIProvider {
+  readonly name: AIProvider['name'];
+  private readonly inner: AIProvider;
+  private readonly fallback = new RuleBasedAIProvider();
+  private readonly limiter: SlidingWindowLimiter;
+  private readonly callsPerHour: number;
+  private readonly now: () => Date;
+  private exhausted = false;
+
+  constructor(inner: AIProvider, options: AIBudgetOptions) {
+    this.inner = inner;
+    this.name = inner.name;
+    this.callsPerHour = Math.max(1, Math.floor(options.callsPerHour));
+    this.limiter = new SlidingWindowLimiter({ limit: this.callsPerHour, windowMs: HOUR_MS });
+    this.now = options.now ?? (() => new Date());
+  }
+
+  describe(): string {
+    return `${this.inner.describe()} At most ${this.callsPerHour} model calls an hour; past that the rule-based fallback answers.`;
+  }
+
+  /** Takes one call from the budget. False when the hour's budget is used up. */
+  private spend(stage: string): boolean {
+    const verdict = this.limiter.check('model', this.now().getTime());
+    if (verdict.allowed) {
+      this.exhausted = false;
+      return true;
+    }
+    // Logged once per exhaustion, not once per refused call.
+    if (!this.exhausted) {
+      this.exhausted = true;
+      const minutes = Math.ceil(verdict.retryAfterMs / 60_000);
+      console.warn(
+        `[faregate] ai ${stage}: the budget of ${this.callsPerHour} model calls an hour is used up; the rule-based fallback answers for about ${minutes} minute(s)`,
+      );
+    }
+    return false;
+  }
+
+  interpret(prompt: string): Promise<InterpretResult> {
+    return this.spend('interpret') ? this.inner.interpret(prompt) : this.fallback.interpret(prompt);
+  }
+
+  explain(decision: PolicyDecision, query: ResourceQuery | null, agent: Agent | null): Promise<string> {
+    return this.spend('explain')
+      ? this.inner.explain(decision, query, agent)
+      : this.fallback.explain(decision, query, agent);
+  }
+
+  analyze(query: ResourceQuery, data: unknown, provenance: DataProvenance): Promise<AnalysisResult> {
+    return this.spend('analyze')
+      ? this.inner.analyze(query, data, provenance)
+      : this.fallback.analyze(query, data, provenance);
+  }
 }

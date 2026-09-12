@@ -18,5 +18,7 @@ Short version:
 - Untrusted structured input is validated and clamped. Model output is
   re-validated and grounding-checked.
 - Identity fails closed when ENS is configured and unreachable.
-- Agents are rate-limited per passport; humans per caller.
+- Agents are rate-limited per passport; humans per caller. Model calls are
+  capped per hour across every caller; past the cap the rule-based parser
+  answers.
 - No custody, no keys in the gateway, no transaction ever sent by it.

@@ -2,7 +2,7 @@
  * Turns an agent's natural-language ask into a structured, priceable query.
  *
  * This module is deliberately rule-based and pure. The AI layer in
- * `ai/interpreter.ts` wraps it: the model may propose a structured query, but
+ * `ai/provider.ts` wraps it: the model may propose a structured query, but
  * whatever it proposes is validated by `parseStructuredQuery` below before the
  * policy engine ever sees it. A model that invents a resource kind, an address
  * or a 900-day lookback produces a rejected parse, not a privileged query.

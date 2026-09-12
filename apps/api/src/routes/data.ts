@@ -237,7 +237,8 @@ export function createDataRouter(deps: DataRouteDeps): Router {
     if (live) {
       // Settlement happens after this handler responds. If it fails, the agent
       // receives a payment error instead of this body, so the request was not
-      // delivered: release the fare and mark it failed rather than fulfilled.
+      // delivered: release the fare, drop the data it never received, and mark
+      // it failed rather than fulfilled.
       res.on('finish', () => {
         const settlement = decodeSettlement(res.getHeader(SETTLEMENT_HEADER));
         const settled = res.statusCode < 400 && settlement?.success === true;
@@ -267,6 +268,7 @@ export function createDataRouter(deps: DataRouteDeps): Router {
         store.updateRequest(requestId, {
           status: 'failed',
           payment: undefined,
+          result: undefined,
           error: 'The facilitator did not settle the payment, so the data was withheld and nothing was charged.',
         });
         store.recordEvent({

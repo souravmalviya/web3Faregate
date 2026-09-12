@@ -105,6 +105,12 @@ export interface AiConfig {
   mode: SubsystemMode;
   apiKey: string | undefined;
   model: string;
+  /**
+   * Model calls allowed in any rolling hour, whoever asks. Request submission
+   * is open to every agent that can reach the gateway, so on a public host this
+   * is what caps the model bill.
+   */
+  callsPerHour: number;
   reason?: string;
 }
 
@@ -127,7 +133,8 @@ export interface RateLimitConfig {
 
 export interface AppConfig {
   port: number;
-  corsOrigin: string;
+  /** Origins the dashboard may call from. Comma-separated in the environment. */
+  corsOrigins: string[];
   /**
    * Trust the first X-Forwarded-For hop. Needed behind a hosting provider's
    * proxy, otherwise every caller shares the proxy's address and one per-caller
@@ -200,18 +207,23 @@ function loadData(): DataConfig {
  */
 export const DEFAULT_AI_MODEL = 'openai/gpt-4.1-mini';
 
+/** Enough for a hundred requests an hour at three model calls each. */
+export const DEFAULT_AI_CALLS_PER_HOUR = 300;
+
 function loadAi(): AiConfig {
   const apiKey = str('OPENROUTER_API_KEY');
   const model = str('OPENROUTER_MODEL') ?? DEFAULT_AI_MODEL;
+  const callsPerHour = Math.max(1, int('FAREGATE_AI_CALLS_PER_HOUR', DEFAULT_AI_CALLS_PER_HOUR));
   if (!apiKey) {
     return {
       mode: 'simulated',
       apiKey,
       model,
+      callsPerHour,
       reason: 'OPENROUTER_API_KEY is not set, so requests are parsed by the rule-based fallback.',
     };
   }
-  return { mode: 'live', apiKey, model };
+  return { mode: 'live', apiKey, model, callsPerHour };
 }
 
 function loadEns(): EnsConfig {
@@ -239,7 +251,10 @@ function loadStateFile(): string | null {
 export function loadConfig(): AppConfig {
   return {
     port: int('PORT', 8402),
-    corsOrigin: str('FAREGATE_CORS_ORIGIN') ?? 'http://localhost:3000',
+    corsOrigins: (str('FAREGATE_CORS_ORIGIN') ?? 'http://localhost:3000')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     trustProxy: bool('FAREGATE_TRUST_PROXY', false),
     requireSignedActions: bool('FAREGATE_REQUIRE_SIGNED_ACTIONS', true),
     stateFile: loadStateFile(),

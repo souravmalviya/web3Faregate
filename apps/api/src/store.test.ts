@@ -5,6 +5,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import type { AccessRequest } from '@faregate/shared';
+
 import { GatewayStore, seedDemoData, utcDayKey } from './store.ts';
 
 const AGENT = 'research.agents.faregate.eth';
@@ -99,6 +101,8 @@ test('state survives a restart through the snapshot file, including a revocation
     first.recordEvent({ type: 'agent.revoked', actor: 'human', agentId: AGENT });
     first.flush();
     assert.ok(existsSync(file));
+    // /health shows where state lives without publishing the whole path.
+    assert.match(first.describePersistence(), /^snapshot file [^\\/]+\/[^\\/]+$/);
 
     const second = new GatewayStore({ file });
     assert.equal(second.getAgent(AGENT)?.status, 'revoked');
@@ -148,4 +152,36 @@ test('a store without a file never touches the disk', () => {
   seedDemoData(store);
   store.flush();
   assert.equal(store.describePersistence(), 'memory only');
+});
+
+test('the request table is capped: the oldest finished requests go first and a waiting one is never dropped', () => {
+  const store = new GatewayStore({ requestCap: 3 });
+  const row = (id: string, status: AccessRequest['status'], minute: number): AccessRequest => {
+    const at = `2026-09-10T12:${String(minute).padStart(2, '0')}:00.000Z`;
+    return {
+      id,
+      agentId: AGENT,
+      prompt: 'x',
+      query: { resource: 'wallet.balances', address: '0x0000000000000000000000000000000000000000', lookbackDays: 1 },
+      status,
+      estimatedCostUsd: 0,
+      createdAt: at,
+      updatedAt: at,
+    };
+  };
+
+  store.putRequest(row('waiting', 'awaiting_approval', 0));
+  store.putRequest(row('old-refused', 'rejected', 1));
+  store.putRequest(row('delivered', 'fulfilled', 2));
+  store.putRequest(row('cleared', 'payment_required', 3));
+  store.putRequest(row('new-refused', 'rejected', 4));
+
+  // Two over the cap: the two oldest finished rows are gone, the waiting and
+  // cleared rows survive although they are older.
+  assert.equal(store.listRequests().length, 3);
+  assert.equal(store.getRequest('old-refused'), null);
+  assert.equal(store.getRequest('delivered'), null);
+  assert.ok(store.getRequest('waiting'));
+  assert.ok(store.getRequest('cleared'));
+  assert.ok(store.getRequest('new-refused'));
 });

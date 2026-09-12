@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { OpenRouterAIProvider, RuleBasedAIProvider, groundAnalysis } from './provider.ts';
+import {
+  BudgetedAIProvider,
+  OpenRouterAIProvider,
+  RuleBasedAIProvider,
+  groundAnalysis,
+  type AIProvider,
+} from './provider.ts';
 import { parseStructuredQuery } from '../query-parser.ts';
 import type { DataProvenance, PolicyDecision, ResourceQuery } from '@faregate/shared';
 
@@ -231,4 +237,53 @@ test('openrouter content-filter declines fall back to the rule-based summary', a
   const query: ResourceQuery = { resource: 'wallet.balances', address: ADDRESS, lookbackDays: 1 };
   const out = await ai.analyze(query, { events: [1] }, provenance);
   assert.equal(out.provider, 'rule-based');
+});
+
+// --- budget ---------------------------------------------------------------
+
+test('the model budget hands over to the rule-based provider when used up, and recovers as the hour slides', async (t) => {
+  const warnings = t.mock.method(console, 'warn', () => {});
+  let modelCalls = 0;
+  const model: AIProvider = {
+    name: 'openrouter',
+    describe: () => 'Fake model.',
+    async interpret() {
+      modelCalls += 1;
+      return {
+        proposal: { resource: 'wallet.balances', address: ADDRESS, lookbackDays: 1 },
+        rationale: 'model',
+        provider: 'openrouter',
+      };
+    },
+    async explain() {
+      modelCalls += 1;
+      return 'model explanation';
+    },
+    async analyze() {
+      modelCalls += 1;
+      return { text: 'model analysis', provider: 'openrouter', groundingWarnings: [] };
+    },
+  };
+  let clock = Date.parse('2026-09-10T12:00:00.000Z');
+  const ai = new BudgetedAIProvider(model, { callsPerHour: 2, now: () => new Date(clock) });
+  const query: ResourceQuery = { resource: 'wallet.balances', address: ADDRESS, lookbackDays: 1 };
+
+  assert.equal((await ai.interpret(`balance of ${ADDRESS} today`)).provider, 'openrouter');
+  assert.equal(await ai.explain(APPROVAL_DECISION, null, null), 'model explanation');
+  assert.equal(modelCalls, 2);
+
+  // The budget is spent: the model is not called again this hour, the
+  // rule-based provider answers honestly, and the switch is logged once.
+  assert.equal((await ai.interpret(`balance of ${ADDRESS} today`)).provider, 'rule-based');
+  assert.equal((await ai.analyze(query, {}, provenance)).provider, 'rule-based');
+  assert.equal(modelCalls, 2);
+  assert.equal(warnings.mock.calls.length, 1);
+  assert.match(String(warnings.mock.calls[0]?.arguments[0]), /budget of 2 model calls an hour/);
+  assert.match(ai.describe(), /At most 2 model calls an hour/);
+  assert.equal(ai.name, 'openrouter');
+
+  // An hour later the window has slid past the first calls.
+  clock += 60 * 60 * 1000 + 1;
+  assert.equal((await ai.analyze(query, {}, provenance)).provider, 'openrouter');
+  assert.equal(modelCalls, 3);
 });

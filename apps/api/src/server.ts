@@ -2,7 +2,12 @@
 
 import type { x402HTTPResourceServer } from '@x402/core/server';
 
-import { OpenRouterAIProvider, RuleBasedAIProvider, type AIProvider } from './ai/provider.ts';
+import {
+  BudgetedAIProvider,
+  OpenRouterAIProvider,
+  RuleBasedAIProvider,
+  type AIProvider,
+} from './ai/provider.ts';
 import { createApp } from './app.ts';
 import { BLOCKY402_MAINNET, BLOCKY402_TESTNET, describeModes, loadConfig } from './config.ts';
 import {
@@ -35,9 +40,14 @@ const dataProvider: DataProvider =
       })
     : new SimulatedDataProvider();
 
+// The live model sits behind an hourly call budget, so a public gateway cannot
+// be made to run up a model bill; past the budget the rule-based provider
+// answers and says so.
 const aiProvider: AIProvider =
   config.ai.mode === 'live' && config.ai.apiKey
-    ? new OpenRouterAIProvider({ apiKey: config.ai.apiKey, model: config.ai.model })
+    ? new BudgetedAIProvider(new OpenRouterAIProvider({ apiKey: config.ai.apiKey, model: config.ai.model }), {
+        callsPerHour: config.ai.callsPerHour,
+      })
     : new RuleBasedAIProvider();
 
 // ENS is the source of truth for passports when it is configured. The two

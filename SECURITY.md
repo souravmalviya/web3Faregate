@@ -80,6 +80,20 @@ passport and per caller, and human actions and explanations per caller,
 answering 429 with `Retry-After`. Behind a hosting proxy, set
 `FAREGATE_TRUST_PROXY=true` so the caller is the client, not the proxy.
 
+**Memory is bounded.** The request table, the consumed-signature table and
+the idempotency table are capped (`apps/api/src/store.ts`). The oldest
+finished entries are dropped first, and a request still waiting on a human
+or on a payment is never dropped, so a flood of refused submissions can only
+shorten the history, not exhaust the host or grow the snapshot without limit.
+
+**Model spend is capped.** The live model sits behind `BudgetedAIProvider`
+(`apps/api/src/ai/provider.ts`), a budget on model calls per rolling hour
+counted across every caller (`FAREGATE_AI_CALLS_PER_HOUR`, 300 by default,
+200 on the hosted gateway). Past it, every interpretation, explanation and
+analysis is answered by the rule-based provider and the gateway logs the
+switch once. Request submission is open, so this is what puts a ceiling on
+the model bill.
+
 **Unknown passports never reach the model.** Identity is resolved before
 interpretation. A request from a name with no passport is parsed by the free
 rule-based parser and refused, so nobody can spend model credits by inventing
@@ -113,6 +127,13 @@ provider that fails, fails; it never falls back to simulated data.
   agent to the wallet that created it. Adding one is a policy field away.
 - **Unsigned mode exists.** `FAREGATE_REQUIRE_SIGNED_ACTIONS=false` accepts
   unsigned actions and records them as unsigned. It is for local experiments.
+- **Free hosting forgets.** On a free Render instance the snapshot file is
+  wiped whenever the service sleeps or redeploys, so the request queue, the
+  spend ledger, used signatures and idempotency keys start empty again.
+  Daily limits then count from the restart, and a signature captured inside
+  its ten-minute window could be replayed after one. Passports are unaffected
+  because they live on Sepolia. Acceptable for a testnet demo; not for real
+  money, which would need shared persistent state.
 
 ## Secrets
 

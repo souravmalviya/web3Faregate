@@ -49,8 +49,7 @@
  *   ENS_OWNER_PRIVATE_KEY the passport owner's key, Sepolia only, never mainnet
  */
 
-import 'dotenv/config';
-
+import { config as loadDotenv } from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +66,11 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { sepolia } from 'viem/chains';
 import { normalize } from 'viem/ens';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+// Read .env from the repository root, so the script behaves the same from any
+// working directory.
+loadDotenv({ path: path.join(ROOT, '.env'), quiet: true });
 
 const RESOLVER_ABI = parseAbi([
   'function setText(bytes32 node, string key, string value)',
@@ -121,7 +125,7 @@ function asAddress(v: string, what: string): Address {
 /** The resolver `npm run ens:setup` deployed, so --resolver can be left out after setup. */
 function savedResolver(): string | undefined {
   try {
-    const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/ens-setup.json');
+    const file = path.join(ROOT, 'data', 'ens-setup.json');
     return (JSON.parse(fs.readFileSync(file, 'utf8')) as { resolver?: string }).resolver;
   } catch {
     return undefined;

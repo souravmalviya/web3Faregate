@@ -9,8 +9,10 @@
  * It narrates each step because this is what runs during the demo video.
  *
  * Usage:
- *   npm run agent -- --agent research.agents.faregate.eth --ask "..."
- *   npm run agent -- --scenario revoked
+ *   npm run agent                                                 the default ask, as the research agent
+ *   npm run agent -- --agent trial.agents.faregate.eth --ask "..."
+ *   npm run agent -- --request <id>     collect a quote this agent already holds (the revocation moment)
+ *   npm run agent -- --wait 300         seconds to wait for a human, default 120
  */
 
 import { config as loadDotenv } from 'dotenv';
@@ -35,12 +37,12 @@ const DEFAULT_ASK =
 
 // --- console helpers -----------------------------------------------------
 
-const DIM = '[2m';
-const BOLD = '[1m';
-const GREEN = '[32m';
-const RED = '[31m';
-const YELLOW = '[33m';
-const RESET = '[0m';
+const DIM = '\u001b[2m';
+const BOLD = '\u001b[1m';
+const GREEN = '\u001b[32m';
+const RED = '\u001b[31m';
+const YELLOW = '\u001b[33m';
+const RESET = '\u001b[0m';
 
 let stepNumber = 0;
 function step(title: string): void {

@@ -20,8 +20,9 @@ third. Keep both visible the whole time. Do not switch windows.
    npm run dev:api       # start the gateway again
    ```
 
-3. The top bar shows **PAYMENT LIVE, DATA LIVE, AI LIVE, ENS LIVE**. If the
-   agent account has no test USDC, see "No test USDC" at the bottom first.
+3. The top bar shows **Hedera x402, The Graph, AI and ENS**, each marked
+   **live**. If the agent account has no test USDC, see "No test USDC" at the
+   bottom first.
 4. The terminal on the right is open in the `faregate` folder.
 
 Read the quoted lines out loud. Pause where the audience needs to read.
@@ -79,8 +80,10 @@ MetaMask.
 > I approve, and my wallet signs it, so there is proof it was me. Now the
 > agent pays, not me.
 
-Terminal: `Approved by a human`, then the payment. Dashboard: open the request
-and point at the payment card and its HashScan link.
+Terminal: `Approved by a human`, then the payment. Dashboard: click **Details**
+on the request and point at the **Payment** panel and its **View on HashScan**
+button. The progress tracker on the card now reads Asked, Rules, Approval,
+Paid, Data, all green.
 
 > The agent paid 3.6 cents in USDC on Hedera testnet, and here is the
 > transaction on HashScan.
@@ -136,8 +139,8 @@ Stop recording.
 
 - **No test USDC in the agent account.** Before recording, change
   `FAREGATE_PAY_TO=0.0.10457565` to `FAREGATE_PAY_TO=` in `.env` and restart
-  the gateway. The top bar shows PAYMENT SIMULATED. Say "payment is simulated
-  in this recording" out loud.
+  the gateway. The top bar shows Hedera x402 as simulated. Say "payment is
+  simulated in this recording" out loud.
 - **MetaMask does not pop up.** Click the MetaMask icon; the request may be
   waiting there. Check that the dashboard shows Sepolia at the top right.
 - **The agent stops waiting before you approve.** Run

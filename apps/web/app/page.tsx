@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { CircleCheck, TriangleAlert } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
   buildActionMessage,
@@ -13,8 +15,10 @@ import {
 import { ActivityFeed } from '@/components/ActivityFeed';
 import { AgentsPanel } from '@/components/AgentsPanel';
 import { RequestQueue } from '@/components/RequestQueue';
+import { StatsBar } from '@/components/StatsBar';
 import { SubmitBox } from '@/components/SubmitBox';
 import { TopBar } from '@/components/TopBar';
+import { Badge } from '@/components/ui';
 import {
   GatewayError,
   api,
@@ -100,8 +104,6 @@ function explainFailure(err: unknown): string {
         return 'The wallet signature did not match. Make sure the connected account is the one you meant to act with.';
       case 'signature_expired':
         return 'That signature took too long to reach the gateway. Try again.';
-      case 'rate_limited':
-        return err.message;
       default:
         return err.message;
     }
@@ -115,10 +117,7 @@ export default function Dashboard() {
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ text: string; tone: 'ok' | 'bad' } | null>(null);
 
-  const agentLabels = useMemo(
-    () => Object.fromEntries(agents.map((a) => [a.id, a.label])),
-    [agents],
-  );
+  const agentLabels = useMemo(() => Object.fromEntries(agents.map((a) => [a.id, a.label])), [agents]);
   const parentName = health?.parentName ?? 'agents.faregate.eth';
   const canAct = wallet.address !== null && wallet.chainId === EXPECTED_CHAIN.id;
 
@@ -154,40 +153,49 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-ground">
+    <div className="relative min-h-screen overflow-x-hidden">
+      <div className="app-glow" aria-hidden />
+      <div className="bg-grid pointer-events-none absolute inset-x-0 top-0 h-[560px]" aria-hidden />
+
       <TopBar health={health} wallet={wallet} onConnect={connect} onSwitchChain={switchChain} />
 
-      <main className="mx-auto flex max-w-[1240px] flex-col gap-10 px-6 pt-8 pb-24">
+      <main className="relative mx-auto flex max-w-[1280px] flex-col gap-10 px-6 pb-20 pt-10">
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="flex flex-col items-start gap-4"
+        >
+          <Badge tone="brand" dot pulse>
+            Hedera x402 · The Graph · ENSv2
+          </Badge>
+          <h1 className="max-w-3xl text-[34px] font-semibold leading-[1.1] tracking-tight text-white sm:text-[44px]">
+            Agents buy onchain data. <span className="text-gradient">You set the rules.</span>
+          </h1>
+          <p className="max-w-2xl text-[15px] leading-relaxed text-zinc-400">
+            Every request is checked against the agent&apos;s ENS passport, waits for your signature when it costs more
+            than you allow, is paid per query in USDC on Hedera, and only then receives live data from The Graph.
+          </p>
+        </motion.section>
+
         {error ? (
-          <div className="rounded-sm border border-stop bg-stop-fill px-4 py-3 text-[14px] text-stop">
-            {error}. Start the gateway with <code className="font-mono">npm run dev:api</code>.
-          </div>
+          <Banner>
+            {error}. Start the gateway with{' '}
+            <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12.5px]">npm run dev:api</code>.
+          </Banner>
         ) : null}
 
-        {wallet.error ? (
-          <div role="alert" className="rounded-sm border border-stop bg-stop-fill px-4 py-3 text-[14px] text-stop">
-            {wallet.error}
-          </div>
-        ) : null}
+        {wallet.error ? <Banner>{wallet.error}</Banner> : null}
 
         {health && health.notes.length > 0 ? (
-          <div className="flex flex-col gap-1 rounded-sm border border-rule bg-surface px-4 py-3 text-[13px] text-muted">
+          <div className="flex flex-col gap-1 rounded-2xl border border-amber-400/20 bg-amber-500/[0.06] px-4 py-3 text-[13px] text-amber-200/90">
             {health.notes.map((note, i) => (
               <div key={i}>{note}</div>
             ))}
           </div>
         ) : null}
 
-        {flash ? (
-          <div
-            role="status"
-            className={`rounded-sm border px-4 py-2.5 text-[14px] ${
-              flash.tone === 'ok' ? 'border-brass bg-brass-fill text-ink' : 'border-stop bg-stop-fill text-stop'
-            }`}
-          >
-            {flash.text}
-          </div>
-        ) : null}
+        <StatsBar requests={requests} agents={agents} />
 
         <RequestQueue
           requests={requests}
@@ -263,6 +271,48 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      <footer className="relative border-t border-white/[0.06] px-6 py-8 text-center text-[12.5px] text-zinc-500">
+        Faregate · payments with x402 on Hedera · data from The Graph · agent passports on ENSv2 · every human action
+        signed by your wallet
+      </footer>
+
+      <AnimatePresence>
+        {flash ? (
+          <motion.div
+            key={flash.text}
+            role="status"
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            className={`fixed bottom-6 right-6 z-50 flex max-w-md items-start gap-3 rounded-2xl border px-4 py-3 text-[13.5px] leading-relaxed shadow-2xl backdrop-blur-xl ${
+              flash.tone === 'ok'
+                ? 'border-emerald-400/25 bg-emerald-950/85 text-emerald-100'
+                : 'border-rose-400/25 bg-rose-950/85 text-rose-100'
+            }`}
+          >
+            {flash.tone === 'ok' ? (
+              <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" aria-hidden />
+            ) : (
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" aria-hidden />
+            )}
+            <span>{flash.text}</span>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function Banner({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-3 rounded-2xl border border-rose-400/25 bg-rose-500/[0.08] px-4 py-3 text-[14px] text-rose-200"
+    >
+      <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      <div>{children}</div>
     </div>
   );
 }

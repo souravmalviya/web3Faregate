@@ -1,27 +1,47 @@
 'use client';
 
+import {
+  Activity,
+  BadgeDollarSign,
+  Ban,
+  CircleCheck,
+  CircleX,
+  Database,
+  Hand,
+  MessageSquare,
+  PackageCheck,
+  Receipt,
+  Scale,
+  ShieldX,
+  SlidersHorizontal,
+  Sparkles,
+  TriangleAlert,
+  UserPlus,
+  type LucideIcon,
+} from 'lucide-react';
+
 import type { AuditEvent, AuditEventType } from '@faregate/shared';
 
 import { shortAddress, shortHash, timeAgo } from '@/lib/api';
 
-import { Empty, Pill, Section, type Tone } from './ui';
+import { Card, Empty, ICON_TONE, Section, type Tone } from './ui';
 
-const EVENT_TONE: Record<AuditEventType, Tone> = {
-  'agent.created': 'info',
-  'agent.revoked': 'stop',
-  'policy.updated': 'info',
-  'request.received': 'neutral',
-  'request.evaluated': 'neutral',
-  'request.approval_requested': 'hold',
-  'request.approved': 'pass',
-  'request.rejected': 'stop',
-  'payment.required': 'info',
-  'payment.verified': 'pass',
-  'payment.rejected': 'stop',
-  'data.retrieved': 'pass',
-  'analysis.completed': 'neutral',
-  'request.fulfilled': 'pass',
-  'request.failed': 'stop',
+const EVENT_META: Record<AuditEventType, { label: string; tone: Tone; icon: LucideIcon }> = {
+  'agent.created': { label: 'Agent created', tone: 'brand', icon: UserPlus },
+  'agent.revoked': { label: 'Agent revoked', tone: 'stop', icon: Ban },
+  'policy.updated': { label: 'Rules updated', tone: 'brand', icon: SlidersHorizontal },
+  'request.received': { label: 'Agent asked', tone: 'neutral', icon: MessageSquare },
+  'request.evaluated': { label: 'Rules checked', tone: 'neutral', icon: Scale },
+  'request.approval_requested': { label: 'Waiting for you', tone: 'hold', icon: Hand },
+  'request.approved': { label: 'Approved', tone: 'pass', icon: CircleCheck },
+  'request.rejected': { label: 'Refused', tone: 'stop', icon: CircleX },
+  'payment.required': { label: 'Price quoted', tone: 'info', icon: Receipt },
+  'payment.verified': { label: 'Payment settled', tone: 'pass', icon: BadgeDollarSign },
+  'payment.rejected': { label: 'Refused at the gate', tone: 'stop', icon: ShieldX },
+  'data.retrieved': { label: 'Data retrieved', tone: 'pass', icon: Database },
+  'analysis.completed': { label: 'AI summary', tone: 'brand', icon: Sparkles },
+  'request.fulfilled': { label: 'Delivered', tone: 'pass', icon: PackageCheck },
+  'request.failed': { label: 'Failed', tone: 'stop', icon: TriangleAlert },
 };
 
 function signedBy(d: Record<string, unknown>): string {
@@ -67,24 +87,50 @@ function describe(event: AuditEvent): string {
 
 export function ActivityFeed({ events }: { events: AuditEvent[] }) {
   return (
-    <Section eyebrow="Activity" title="Audit trail" aside="append-only">
+    <Section
+      icon={<Activity className="h-4.5 w-4.5" aria-hidden />}
+      title="Audit trail"
+      description="Every step, recorded in order. Nothing is edited."
+      aside={events.length > 0 ? <span>{events.length} events</span> : null}
+    >
       {events.length === 0 ? (
-        <Empty>Nothing has happened yet.</Empty>
+        <Empty icon={<Activity className="h-6 w-6" aria-hidden />} title="Nothing has happened yet">
+          Events appear here as agents ask, you approve, and payments settle.
+        </Empty>
       ) : (
-        <ol className="flex max-h-[560px] flex-col overflow-y-auto rounded-sm border border-rule bg-surface">
-          {events.map((event) => (
-            <li key={event.id} className="flex items-start gap-3 border-b border-rule px-4 py-2.5 last:border-b-0">
-              <span className="w-[62px] shrink-0 pt-0.5 font-mono text-[11px] text-muted">{timeAgo(event.at)}</span>
-              <span className="w-[178px] shrink-0">
-                <Pill tone={EVENT_TONE[event.type]}>{event.type}</Pill>
-              </span>
-              <span className="min-w-0 flex-1 text-[13px] text-ink-2">
-                <span className="mr-2 font-mono text-[11px] text-muted">{event.actor}</span>
-                {describe(event)}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <Card className="p-2">
+          <ol className="scroll-thin flex max-h-[520px] flex-col overflow-y-auto">
+            {events.map((event) => {
+              const meta = EVENT_META[event.type];
+              const Icon = meta.icon;
+              return (
+                <li
+                  key={event.id}
+                  title={event.type}
+                  className="flex gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.03]"
+                >
+                  <span
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${ICON_TONE[meta.tone]}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[13px] font-medium text-zinc-100">{meta.label}</span>
+                      <span className="shrink-0 text-[11px] text-zinc-500">{timeAgo(event.at)}</span>
+                    </div>
+                    <div className="mt-0.5 truncate text-[12.5px] text-zinc-400">
+                      <span className="mr-1.5 rounded bg-white/5 px-1.5 py-px font-mono text-[10.5px] text-zinc-400">
+                        {event.actor}
+                      </span>
+                      {describe(event)}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </Card>
       )}
     </Section>
   );

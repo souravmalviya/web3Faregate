@@ -1,40 +1,20 @@
 import type { Metadata } from 'next';
-import { Barlow, Barlow_Condensed, IBM_Plex_Mono } from 'next/font/google';
+import { Geist, Geist_Mono } from 'next/font/google';
+import type { ReactNode } from 'react';
 
 import './globals.css';
 
-const barlowCondensed = Barlow_Condensed({
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  variable: '--font-barlow-condensed',
-  display: 'swap',
-});
-
-const barlow = Barlow({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-barlow',
-  display: 'swap',
-});
-
-const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-plex-mono',
-  display: 'swap',
-});
+const geistSans = Geist({ subsets: ['latin'], variable: '--font-geist-sans', display: 'swap' });
+const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Faregate',
+  title: 'Faregate · Agents buy onchain data, humans set the rules',
   description: 'Agents buy onchain data by the query. Humans decide what they are allowed to buy.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${barlowCondensed.variable} ${barlow.variable} ${plexMono.variable}`}
-    >
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>{children}</body>
     </html>
   );

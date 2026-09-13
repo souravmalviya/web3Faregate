@@ -425,28 +425,52 @@ export function PassportCheckArt() {
   );
 }
 
-/** Stop 3: a person approves a bigger request with a signature. */
+/** Stop 3: you approve a bigger fare, and the ticket is stamped and signed. */
 export function ApproveArt() {
   return (
     <Disc id="fg-stop-you" tint="#F5E9D0">
-      <path d="M28 164 C28 124 48 106 74 106 C100 106 120 124 120 164 Z" fill="#2446A6" />
-      <rect x="66" y="82" width="16" height="26" rx="6" fill="#B98A62" />
-      <circle cx="74" cy="62" r="20" fill="#B98A62" />
-      <path d="M54 63 A20 20 0 0 1 94 60 Q84 50 70 53 Q60 55 54 63 Z" fill="#1C1B18" />
-      <rect x="98" y="84" width="34" height="56" rx="6" fill="#1C1B18" />
-      <rect x="102" y="90" width="26" height="42" rx="2" fill="#FBFAF6" />
-      <circle cx="115" cy="106" r="9" fill="#1E6A44" />
+      {/* The stamp, just lifted */}
+      <g transform="rotate(-16 100 40)">
+        <circle cx="100" cy="22" r="10" fill="#4A463E" />
+        <rect x="95" y="31" width="10" height="13" fill="#4A463E" />
+        <rect x="86" y="44" width="28" height="8" rx="2" fill="#1C1B18" />
+        <rect x="89" y="52" width="22" height="4" rx="1" fill="#1E6A44" />
+      </g>
+      <g stroke="#95570A" strokeWidth="2" strokeLinecap="round">
+        <line x1="80" y1="70" x2="75" y2="64" />
+        <line x1="122" y1="66" x2="128" y2="61" />
+      </g>
+
+      {/* The fare ticket, with its perforated stub */}
+      <rect x="24" y="76" width="112" height="48" rx="3" fill="#FBFAF6" stroke="#1C1B18" strokeWidth="1.5" />
+      <line x1="104" y1="80" x2="104" y2="120" stroke="#BFB7A5" strokeDasharray="3 3" />
+      <text className={D} x="120" y="106" fontSize="17" textAnchor="middle" fill="#1C1B18">
+        $
+      </text>
+      <g transform="rotate(-8 62 94)">
+        <rect x="30" y="84" width="64" height="20" rx="2" fill="#E0EEE5" fillOpacity="0.7" stroke="#1E6A44" strokeWidth="2.2" />
+        {/* A fixed length keeps the word inside its box whichever font loads. */}
+        <text
+          className={D}
+          x="62"
+          y="98.3"
+          fontSize="11.5"
+          textAnchor="middle"
+          textLength="54"
+          lengthAdjust="spacingAndGlyphs"
+          fill="#1E6A44"
+        >
+          APPROVED
+        </text>
+      </g>
+      <line x1="32" y1="118" x2="92" y2="118" stroke="#DDD7CA" strokeWidth="1.2" />
       <path
-        d="M110.5 106.3 L113.8 109.4 L119.5 102.8"
+        d="M34 115 C38 107 42 119 47 112 S55 105 58 113 S66 117 70 110 S80 108 86 113"
         fill="none"
-        stroke="#FBFAF6"
-        strokeWidth="2.2"
+        stroke="#1C1B18"
+        strokeWidth="1.6"
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
-      <rect x="105" y="121" width="20" height="5" rx="2" fill="#1E6A44" />
-      <path d="M100 152 C98 140 99 132 104 127" fill="none" stroke="#2446A6" strokeWidth="12" strokeLinecap="round" />
-      <circle cx="103" cy="127" r="7" fill="#B98A62" />
     </Disc>
   );
 }

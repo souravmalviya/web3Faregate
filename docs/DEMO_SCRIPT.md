@@ -44,8 +44,9 @@ About ten minutes, all off camera.
    for the video, so your main wallet address is not recorded. Signing needs
    no funds.
 9. **Connect.** Click "Connect wallet" at the top right of the dashboard and
-   approve in MetaMask. If "Switch to Sepolia" appears, click it and approve.
-   The top right now shows your short address and `MetaMask · Sepolia`.
+   approve in MetaMask. Any network works, because the dashboard only asks the
+   wallet to sign messages. The top right now shows your short address and
+   `MetaMask · connected`.
 10. **HashScan banner.** Open https://hashscan.io in a new tab, click "REJECT"
     on the cookie banner, and close the tab. Otherwise the banner covers the
     payment on camera.
@@ -324,7 +325,7 @@ request from this agent is refused at the gate."
 |---|---|
 | The agent prints `No decision within 120s.` | You took longer than two minutes to approve. Start another take and run the agent as `npm run agent -- --wait 300`. |
 | MetaMask does not open after "Approve" | Click the fox icon in Chrome's toolbar. The request is waiting there. |
-| "Approve" is greyed out, with "Connect a wallet on Sepolia to sign." | Use "Connect wallet" or "Switch to Sepolia" at the top right. |
+| The ticket shows "Connect to approve" instead of "Approve" | Click it, or "Connect wallet" at the top right, and approve the connection in MetaMask. |
 | After the revoke, the agent is not refused and shows `awaiting_approval` | The chain node was a few seconds behind. Do not approve it. Wait 10 seconds, run `npm run agent` again, and cut the first try when editing. Nothing is paid without approval. |
 | A row says "FAILED" | The Graph or the payment facilitator had a hiccup. Nothing was charged. Start another take. |
 | Part of the readout is amber and says simulated | The gateway is missing a setting in `.env`. Stop and fix it before recording. |

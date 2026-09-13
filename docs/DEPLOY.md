@@ -148,11 +148,13 @@ local work.
 ## What a visitor can do on the live dashboard
 
 - Read everything: passports, requests, payments, data and the audit log.
-- Send a request as either agent from **Send a test request**.
-- Approve or reject with their own wallet on Sepolia. Signatures prove who
-  acted, not that they were entitled to; the gateway is single-tenant and its
-  read API is open, as `SECURITY.md` states. Whoever approves, only your
-  agent can pay, and it pays testnet USDC.
+- Send a request as either agent from **Start here** on the Requests page, or
+  from **Try it** on the front page.
+- Approve or reject with their own wallet, on any network: the dashboard only
+  asks the wallet to sign a message. Signatures prove who acted, not that they
+  were entitled to; the gateway is single-tenant and its read API is open, as
+  `SECURITY.md` states. Whoever approves, only your agent can pay, and it pays
+  testnet USDC.
 - See an approved request paid and delivered, when the demo agent is on (step
   4): it pays in test USDC from the agent's own account.
 - Not revoke: with ENS live, revocation is an onchain change by the owner
@@ -165,8 +167,9 @@ curl https://faregate-gateway-xxxx.onrender.com/health
 ```
 
 `modes` all `live`, `notes` empty, `signedActions` true. Then load the
-dashboard, connect MetaMask on Sepolia, send a test request from the panel,
-approve it, and run the agent from your machine to collect it.
+dashboard, open Requests, connect a wallet, send "A month of activity" from
+Start here and approve it. With the demo agent on it is paid and delivered
+within seconds; without it, run the agent from your machine to collect it.
 
 ## If the dashboard can't reach the gateway
 

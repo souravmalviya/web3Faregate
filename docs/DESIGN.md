@@ -111,8 +111,10 @@ transaction ids line up and read as exact values.
   makes it happen.
 - **Error.** The gateway being unreachable is a stop notice with the command
   to start it; the console keeps retrying.
-- **Disabled.** Signed actions are disabled without a wallet on Sepolia, and
-  the reason is written next to them rather than hidden in a tooltip.
+- **Disabled.** Without a connected wallet a waiting ticket offers "Connect to
+  approve" in place of Approve, and the reason is written next to it rather
+  than hidden in a tooltip. Signing a message works on any network, so the
+  console never asks a wallet to switch networks.
 - **Validation.** Forms validate on submit and mark the field that is wrong.
 - **Success.** A notification in the corner states exactly what was signed.
 

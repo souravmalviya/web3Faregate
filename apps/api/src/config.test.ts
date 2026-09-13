@@ -6,9 +6,19 @@ import {
   BLOCKY402_TESTNET,
   corsAllowList,
   defaultFacilitator,
+  keepAwakeTarget,
   parseCorsOrigins,
   parseRpcUrls,
 } from './config.ts';
+
+test('a hosted gateway visits its own public health check to stay awake, unless told otherwise', () => {
+  const render = 'https://faregate-gateway.onrender.com';
+  assert.equal(keepAwakeTarget(undefined, render), `${render}/health`);
+  assert.equal(keepAwakeTarget(undefined, `${render}/`), `${render}/health`);
+  assert.equal(keepAwakeTarget('https://ping.example/health', render), 'https://ping.example/health');
+  assert.equal(keepAwakeTarget('off', render), null);
+  assert.equal(keepAwakeTarget(undefined, undefined), null);
+});
 
 test('ENS RPCs may be listed as fallbacks, kept in order, blanks ignored', () => {
   assert.deepEqual(parseRpcUrls(' https://a.example , ,https://b.example '), ['https://a.example', 'https://b.example']);

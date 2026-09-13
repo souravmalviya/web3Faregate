@@ -19,13 +19,17 @@ the gateway account's key and the ENS owner key never leave your machine.
 ## What free means here
 
 - A free Render instance sleeps after 15 minutes without traffic and takes up
-  to a minute to wake. The repository's **Keep the gateway awake** workflow
-  (`.github/workflows/keep-gateway-awake.yml`) pings `/health` every ten
-  minutes on GitHub's free minutes, so it normally stays up. If it does sleep,
-  the dashboard says the gateway is waking and connects by itself.
+  to a minute to wake, and sleeping empties the request queue and the ledger.
+  So the gateway visits its own public `/health` every ten minutes, using the
+  `RENDER_EXTERNAL_URL` Render sets, and `/health` shows `keepAwake` with the
+  last answer. The **Keep the gateway awake** GitHub workflow pings it too, as
+  a backup: GitHub can delay scheduled runs by hours, so it is not the only
+  guard. If the gateway does sleep, the dashboard says it is waking and
+  connects by itself.
 - Render gives 750 free instance hours a month, enough for one service to run
-  all month. If other free Render services share your workspace, disable that
-  workflow in the **Actions** tab so they keep their hours.
+  all month. If other free Render services share your workspace, set
+  `FAREGATE_KEEP_AWAKE_URL=off` on the gateway and disable the workflow in the
+  **Actions** tab so they keep their hours.
 - The disk is wiped on every deploy and every wake. The request queue, spend
   ledger and used signatures start empty; the passports come from Sepolia and
   are unaffected. `SECURITY.md` says what that means.

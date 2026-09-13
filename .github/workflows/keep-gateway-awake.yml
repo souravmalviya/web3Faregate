@@ -1,7 +1,9 @@
-# Pings the hosted gateway so its free Render instance does not sleep between
-# visitors. A sleeping gateway makes the next visitor wait about a minute and
-# wipes its request queue. Uses GitHub's free minutes for public repositories
-# and changes nothing.
+# A backup ping for the hosted gateway, which already visits its own /health
+# every ten minutes so its free Render instance does not sleep between visitors
+# (a sleeping gateway makes the next visitor wait about a minute and wipes its
+# request queue). GitHub can delay scheduled runs by hours, so this is not the
+# only guard. Uses GitHub's free minutes for public repositories and changes
+# nothing.
 #
 # Render's free plan has 750 instance hours a month, enough for one service to
 # run all month. If other free Render services share the workspace, disable

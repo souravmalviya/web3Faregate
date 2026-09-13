@@ -154,6 +154,9 @@ provider that fails, fails; it never falls back to simulated data.
 - ENS reads fall back through several Sepolia RPCs, so one provider's outage
   does not refuse every agent. If all of them fail, identity still fails
   closed.
+- On a free host the gateway visits its own public health check every ten
+  minutes, so it is not put to sleep and its queue and ledger survive between
+  visitors. A restart by the host still empties them; passports live onchain.
 - A failed snapshot write or a stray promise rejection is logged, never fatal.
 - Every in-memory table and every list the API returns is bounded.
 

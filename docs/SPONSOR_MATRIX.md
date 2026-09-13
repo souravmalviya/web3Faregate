@@ -89,9 +89,10 @@ policy, and an onchain revocation refused at the hosted gate.
 **Facilitator.** Blocky402 runs Hedera testnet at
 `https://api.testnet.blocky402.com` and mainnet at `https://api.blocky402.com`,
 and each host's `/supported` lists only its own network. Faregate defaults to
-the Blocky402 host for the configured network and checks `/supported` before
-the gateway listens, refusing to start if the facilitator cannot settle
-`exact` on that network. The x402.org facilitator also supports
+the Blocky402 host for the configured network and checks `/supported` as the
+gateway starts. Until the facilitator confirms it settles `exact` on that
+network, `/health` says so and paid collection answers 503 with nothing
+charged, and the gateway checks again every 30 seconds. The x402.org facilitator also supports
 `hedera:testnet`, and Hedera's reference PoC uses it for testnet, but this
 bounty requires Blocky402.
 

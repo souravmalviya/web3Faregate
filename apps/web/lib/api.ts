@@ -36,6 +36,8 @@ export interface Health {
   signedActions: boolean;
   /** False while live payments wait for the facilitator to confirm what it settles. */
   paymentReady?: boolean;
+  /** On a free host: the address the gateway visits to stay awake, and when it last answered. */
+  keepAwake?: { target: string; lastAnsweredAt: string | null } | null;
   persistence: string;
   modes: Record<'payment' | 'data' | 'ai' | 'ens', SubsystemMode>;
   notes: string[];

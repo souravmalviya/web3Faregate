@@ -4,7 +4,9 @@
 # sleeps after 15 minutes without traffic and wakes on the next request, and
 # its disk is wiped on every deploy and wake, so the snapshot file is a cache
 # of the queue, not a record. With ENS live the passports come from Sepolia,
-# so nothing that matters is lost.
+# so nothing that matters is lost. To keep the queue and ledger between
+# visitors, the gateway visits its own public /health every ten minutes,
+# using the RENDER_EXTERNAL_URL Render sets; FAREGATE_KEEP_AWAKE_URL=off stops it.
 #
 # The gateway holds no private keys. Only the values marked sync: false are
 # entered in the Render dashboard, and none of them is a key that can move

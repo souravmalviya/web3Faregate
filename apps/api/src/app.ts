@@ -66,8 +66,17 @@ export interface AppDeps {
    * nothing. Omit when the server was initialised before the app was built.
    */
   paymentReady?: () => boolean;
+  /** The entrypoint's keep-awake visits, reported on /health so they can be checked from outside. */
+  keepAwake?: () => KeepAwakeStatus;
   /** Injected so tests can pin time. */
   now?: () => Date;
+}
+
+export interface KeepAwakeStatus {
+  /** The address the gateway visits. */
+  target: string;
+  /** When a visit was last answered, or null before the first. */
+  lastAnsweredAt: string | null;
 }
 
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
@@ -225,6 +234,7 @@ export function createApp(deps: AppDeps): Express {
       time: now().toISOString(),
       modes: describeModes(config),
       paymentReady: !paymentWaiting,
+      keepAwake: deps.keepAwake?.() ?? null,
       notes: [
         config.payment.reason,
         paymentWaiting

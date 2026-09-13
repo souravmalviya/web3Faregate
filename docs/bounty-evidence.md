@@ -9,7 +9,7 @@ it says otherwise.
 ```bash
 npm install && cp .env.example .env
 npm run build --workspace @faregate/shared
-npm test                       # 141 tests
+npm test                       # 142 tests
 npm run e2e:live -- --yes      # live: real payment, Graph data, ENS revoke and restore
 npm run dev:api                # :8402
 npm run dev:web                # :3000
@@ -151,8 +151,8 @@ an onchain act and the gateway fails closed.
 
 **Run.** `npm run ens:setup -- --send` registers the names (see
 `docs/ens-passports.md`). Then set `ENS_RPC_URL` (a public Sepolia RPC works).
-`/health` reports `ens: live` and names the resolver, the dashboard labels the
-passports `ENS passport`, and
+`/health` reports `ens: live` and names the resolver, the dashboard stamps the
+passports `ENS`, and
 `npm run ens:revoke -- research.agents.faregate.eth` makes the next agent
 request fail with `agent_revoked` without any call to the gateway.
 

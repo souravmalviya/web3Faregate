@@ -219,6 +219,7 @@ Turn subsystems live one at a time in `.env`:
 | `ENS_OWNER_PRIVATE_KEY` | unset | Throwaway Sepolia key, read only by `scripts/ens` (`ens:setup`, `ens:revoke`, `ens:restore`) |
 | `ENS_SETUP_RPC_URL` | public Sepolia RPC | RPC for the ENS scripts, kept apart from `ENS_RPC_URL` |
 | `FAREGATE_TRUST_PROXY` | `false` | `true` behind a hosting proxy, so per-caller limits see the client address |
+| `FAREGATE_KEEP_AWAKE_URL` | own `/health` on Render, otherwise off | Visited every ten minutes so a free host does not put the gateway to sleep; `off` disables |
 | `NEXT_PUBLIC_FAREGATE_GATEWAY_URL` | `http://localhost:8402` | Where the dashboard finds the gateway |
 
 ### Networks
@@ -253,7 +254,7 @@ npm run agent -- --agent research.agents.faregate.eth --request <id>
 ## Tests
 
 ```bash
-npm test          # 141 tests: policy engine, pricing, signed actions, store persistence and bounds, rate limiting, CORS, AI grounding and budget, data fan-out, identity fail-closed, payment readiness, HTTP surface
+npm test          # 142 tests: policy engine, pricing, signed actions, store persistence and bounds, rate limiting, CORS, AI grounding and budget, data fan-out, identity fail-closed, payment readiness, HTTP surface
 npm run e2e:live -- --yes   # live, testnet: real Hedera payments, Graph data, AI, ENS revoke and restore
 npm run typecheck
 npm run lint      # ESLint on the dashboard

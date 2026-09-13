@@ -154,6 +154,8 @@ export interface AppConfig {
   requireSignedActions: boolean;
   /** Snapshot file for gateway state, or null to keep everything in memory. */
   stateFile: string | null;
+  /** An address the gateway visits every ten minutes to stay awake, or null. See `keepAwakeTarget`. */
+  keepAwakeUrl?: string | null;
   rateLimit: RateLimitConfig;
   payment: PaymentConfig;
   data: DataConfig;
@@ -262,6 +264,21 @@ function loadStateFile(): string | null {
   return path.isAbsolute(raw) ? raw : path.resolve(REPO_ROOT, raw);
 }
 
+/**
+ * The address a hosted gateway visits so it is not put to sleep.
+ *
+ * A free Render instance sleeps after 15 minutes without inbound traffic, and
+ * sleeping empties the request queue and the ledger. Render sets
+ * RENDER_EXTERNAL_URL on every web service, and a request to that public
+ * address comes back in through Render's edge, which counts as traffic.
+ * FAREGATE_KEEP_AWAKE_URL names another address, or turns this off with `off`.
+ */
+export function keepAwakeTarget(explicit: string | undefined, renderExternalUrl: string | undefined): string | null {
+  if (explicit) return ['off', 'none', 'false'].includes(explicit.toLowerCase()) ? null : explicit;
+  if (!renderExternalUrl) return null;
+  return `${renderExternalUrl.replace(/\/+$/, '')}/health`;
+}
+
 export const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
 
 export interface IgnoredOrigin {
@@ -335,6 +352,7 @@ export function loadConfig(): AppConfig {
     trustProxy: bool('FAREGATE_TRUST_PROXY', false),
     requireSignedActions: bool('FAREGATE_REQUIRE_SIGNED_ACTIONS', true),
     stateFile: loadStateFile(),
+    keepAwakeUrl: keepAwakeTarget(str('FAREGATE_KEEP_AWAKE_URL'), str('RENDER_EXTERNAL_URL')),
     rateLimit: {
       requestsPerMinute: Math.max(1, int('FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE', 60)),
       actionsPerMinute: Math.max(1, int('FAREGATE_RATE_LIMIT_ACTIONS_PER_MINUTE', 30)),

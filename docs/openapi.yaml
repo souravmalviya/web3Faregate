@@ -579,6 +579,13 @@ components:
         parentName: { type: string, description: Parent name new passports are created under. }
         signedActions: { type: boolean }
         paymentReady: { type: boolean, description: False while live payments wait for the facilitator. }
+        keepAwake:
+          type: object
+          nullable: true
+          description: On a free host, the address the gateway visits to stay awake and when it last answered.
+          properties:
+            target: { type: string }
+            lastAnsweredAt: { type: string, format: date-time, nullable: true }
         persistence: { type: string }
         modes:
           type: object

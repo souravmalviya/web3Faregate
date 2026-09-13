@@ -27,6 +27,9 @@ const STARTUP_ENS_TIMEOUT_MS = 8_000;
 const FACILITATOR_TIMEOUT_MS = 15_000;
 /** How long to wait before checking an unreachable facilitator again. */
 const FACILITATOR_RETRY_MS = 30_000;
+/** The first keep-awake visit comes a minute after start, then one every ten minutes. */
+const KEEP_AWAKE_FIRST_MS = 60_000;
+const KEEP_AWAKE_EVERY_MS = 10 * 60_000;
 
 // A stray promise rejection is logged, not fatal: on a public gateway one
 // failed background call must not take every agent offline. A thrown
@@ -110,8 +113,16 @@ const paymentServer: x402HTTPResourceServer | undefined =
   config.payment.mode === 'live' ? createHttpResourceServer({ config, store, identity }) : undefined;
 let paymentReady = paymentServer === undefined;
 
+// A free host sleeps after 15 idle minutes, and sleeping empties the queue and
+// the ledger. A scheduled job elsewhere cannot be relied on to prevent it
+// (GitHub delays scheduled workflows by hours), so the gateway visits its own
+// public address, which counts as traffic, and reports the last answer.
+const awakeTarget = config.keepAwakeUrl ?? null;
+let lastAwakeAnswer: string | null = null;
+
 start();
 if (paymentServer) checkFacilitator(paymentServer);
+if (awakeTarget) keepAwake(awakeTarget);
 
 function start(): void {
   const app = createApp({
@@ -121,6 +132,7 @@ function start(): void {
     aiProvider,
     identity,
     ...(paymentServer ? { paymentServer, paymentReady: () => paymentReady } : {}),
+    ...(awakeTarget ? { keepAwake: () => ({ target: awakeTarget, lastAnsweredAt: lastAwakeAnswer }) } : {}),
   });
 
   const server = app.listen(config.port, () => {
@@ -164,6 +176,11 @@ function start(): void {
     if (config.corsOrigins.includes('https://example.invalid')) {
       console.warn(
         '[faregate] cors     https://example.invalid is a placeholder. Set FAREGATE_CORS_ORIGIN to the dashboard address, or the hosted dashboard cannot reach this gateway.',
+      );
+    }
+    if (awakeTarget) {
+      console.log(
+        `[faregate] awake    visiting ${awakeTarget} every ${KEEP_AWAKE_EVERY_MS / 60_000} minutes so the host does not put the gateway to sleep`,
       );
     }
     for (const note of notes) console.log(`[faregate] note: ${note}`);
@@ -211,6 +228,33 @@ function checkFacilitator(server: x402HTTPResourceServer): void {
       setTimeout(() => checkFacilitator(server), FACILITATOR_RETRY_MS).unref();
     },
   );
+}
+
+/** Visits `target` a minute after start and every ten minutes after that. A failed visit is logged once, not fatal. */
+function keepAwake(target: string): void {
+  let failing = false;
+  const visit = (): void => {
+    fetch(target, { signal: AbortSignal.timeout(30_000) })
+      .then(async (response) => {
+        await response.arrayBuffer();
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        lastAwakeAnswer = new Date().toISOString();
+        if (failing) console.log(`[faregate] awake    ${target} answers again`);
+        failing = false;
+      })
+      .catch((error: unknown) => {
+        if (!failing) {
+          console.warn(
+            `[faregate] awake    could not visit ${target}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        failing = true;
+      });
+  };
+  setTimeout(() => {
+    visit();
+    setInterval(visit, KEEP_AWAKE_EVERY_MS).unref();
+  }, KEEP_AWAKE_FIRST_MS).unref();
 }
 
 /** Rejects when `promise` has not settled within `ms`. A late rejection of `promise` is absorbed. */

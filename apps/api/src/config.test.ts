@@ -7,7 +7,13 @@ import {
   corsAllowList,
   defaultFacilitator,
   parseCorsOrigins,
+  parseRpcUrls,
 } from './config.ts';
+
+test('ENS RPCs may be listed as fallbacks, kept in order, blanks ignored', () => {
+  assert.deepEqual(parseRpcUrls(' https://a.example , ,https://b.example '), ['https://a.example', 'https://b.example']);
+  assert.deepEqual(parseRpcUrls(undefined), []);
+});
 
 test('the default facilitator is the Blocky402 host for the configured network', () => {
   // Blocky402 serves each network from its own host, and each host's

@@ -19,8 +19,13 @@ import {
   type ResourceQuery,
 } from '@faregate/shared';
 
-const ADDRESS_RE = /0x[a-fA-F0-9]{40}/;
+/** Forty hex digits after 0x and no more, so a transaction hash is not read as an address. */
+const ADDRESS_RE = /0x[a-fA-F0-9]{40}(?![a-fA-F0-9])/;
+const ADDRESSES_RE = /0x[a-fA-F0-9]{40}(?![a-fA-F0-9])/g;
 const FULL_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
+/** What a model writes when a request names no wallet. Never a subject to query. */
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 export interface ParseResult {
   query: ResourceQuery | null;
@@ -36,6 +41,22 @@ export function extractAddress(text: string): Address | null {
 
 export function isAddress(value: unknown): value is Address {
   return typeof value === 'string' && FULL_ADDRESS_RE.test(value);
+}
+
+/** Every EVM address a text mentions, lowercased. */
+export function addressesIn(text: string): Set<Address> {
+  return new Set((text.match(ADDRESSES_RE) ?? []).map((match) => match.toLowerCase() as Address));
+}
+
+/**
+ * Whether a proposed query is about something the request actually said: an
+ * address the text names, or, for market data only, no wallet at all. A model
+ * that fills in a placeholder or picks some other address has invented the
+ * subject, and its proposal is not used.
+ */
+export function isGroundedProposal(query: ResourceQuery, text: string): boolean {
+  if (query.resource === 'protocol.markets' && query.address === ZERO_ADDRESS) return true;
+  return addressesIn(text).has(query.address);
 }
 
 /** Keyword table, most specific first. Order matters: `transfers` beats `activity`. */
@@ -133,6 +154,11 @@ export function parseStructuredQuery(value: unknown): ParseResult {
   }
   if (!isAddress(candidate.address)) {
     return { query: null, note: 'Structured query did not carry a valid EVM address.' };
+  }
+  // The zero address stands for "no wallet". Only market data, which is not
+  // about a wallet, may be asked for without one.
+  if (candidate.address.toLowerCase() === ZERO_ADDRESS && candidate.resource !== 'protocol.markets') {
+    return { query: null, note: 'The zero address is a placeholder, not a wallet that can be queried.' };
   }
 
   const rawLookback = candidate.lookbackDays;

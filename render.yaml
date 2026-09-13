@@ -35,8 +35,10 @@ services:
         value: hedera:testnet
       - key: FAREGATE_ASSET
         value: "0.0.429274"
+      # Two public Sepolia RPCs, tried in order, so one provider's outage does
+      # not refuse every agent. Both were checked against the live passports.
       - key: ENS_RPC_URL
-        value: https://ethereum-sepolia-rpc.publicnode.com
+        value: https://ethereum-sepolia-rpc.publicnode.com,https://sepolia.gateway.tenderly.co
       - key: FAREGATE_PARENT_NAME
         value: agents.faregate.eth
       - key: OPENROUTER_MODEL

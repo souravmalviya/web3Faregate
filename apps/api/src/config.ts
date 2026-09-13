@@ -116,7 +116,8 @@ export interface AiConfig {
 
 export interface EnsConfig {
   mode: SubsystemMode;
-  rpcUrl: string | undefined;
+  /** Sepolia RPCs in order. When one fails, a call moves on to the next. */
+  rpcUrls: string[];
   /** Parent name that agent passports live under. */
   parentName: string;
   /** Override for the ENSv2 Universal Resolver address. */
@@ -231,20 +232,28 @@ function loadAi(): AiConfig {
   return { mode: 'live', apiKey, model, callsPerHour };
 }
 
+/** ENS_RPC_URL: one Sepolia RPC, or several comma-separated to fall back through in order. */
+export function parseRpcUrls(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
 function loadEns(): EnsConfig {
-  const rpcUrl = str('ENS_RPC_URL');
+  const rpcUrls = parseRpcUrls(str('ENS_RPC_URL'));
   const parentName = str('FAREGATE_PARENT_NAME') ?? 'agents.faregate.eth';
   const universalResolver = str('ENS_UNIVERSAL_RESOLVER');
-  if (!rpcUrl) {
+  if (rpcUrls.length === 0) {
     return {
       mode: 'simulated',
-      rpcUrl,
+      rpcUrls,
       parentName,
       universalResolver,
       reason: 'ENS_RPC_URL is not set, so passports resolve from the local store.',
     };
   }
-  return { mode: 'live', rpcUrl, parentName, universalResolver };
+  return { mode: 'live', rpcUrls, parentName, universalResolver };
 }
 
 function loadStateFile(): string | null {

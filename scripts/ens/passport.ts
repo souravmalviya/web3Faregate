@@ -133,8 +133,11 @@ function savedResolver(): string | undefined {
 }
 
 function clients() {
+  // ENS_RPC_URL may list fallbacks for the gateway; a script needs the first.
   const rpcUrl =
-    process.env.ENS_RPC_URL?.trim() || process.env.ENS_SETUP_RPC_URL?.trim() || 'https://ethereum-sepolia-rpc.publicnode.com';
+    process.env.ENS_RPC_URL?.split(',')[0]?.trim() ||
+    process.env.ENS_SETUP_RPC_URL?.trim() ||
+    'https://ethereum-sepolia-rpc.publicnode.com';
   const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
 
   const send = flag('send');

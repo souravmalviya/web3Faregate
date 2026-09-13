@@ -21,6 +21,20 @@ import { EnsIdentityService, LocalIdentityService, type IdentityService } from '
 import { createHttpResourceServer } from './payment/x402.ts';
 import { GatewayStore, seedDemoData } from './store.ts';
 
+/** How long startup waits for ENS before serving from the seeded copies. */
+const STARTUP_ENS_TIMEOUT_MS = 8_000;
+/** How long one facilitator check may take. */
+const FACILITATOR_TIMEOUT_MS = 15_000;
+/** How long to wait before checking an unreachable facilitator again. */
+const FACILITATOR_RETRY_MS = 30_000;
+
+// A stray promise rejection is logged, not fatal: on a public gateway one
+// failed background call must not take every agent offline. A thrown
+// exception still ends the process, because its state can no longer be trusted.
+process.on('unhandledRejection', (reason) => {
+  console.error('[faregate] unhandled rejection:', reason instanceof Error ? (reason.stack ?? reason.message) : reason);
+});
+
 const config = loadConfig();
 
 // State survives restarts when a snapshot file is configured. The demo
@@ -54,10 +68,10 @@ const aiProvider: AIProvider =
 // seeded demo agents are named under the passport parent, so once ENS is live
 // they resolve only if their passports have been minted onchain.
 const identity: IdentityService =
-  config.ens.mode === 'live' && config.ens.rpcUrl
+  config.ens.mode === 'live' && config.ens.rpcUrls.length > 0
     ? new EnsIdentityService(
         new EnsPassportResolver({
-          rpcUrl: config.ens.rpcUrl,
+          rpcUrls: config.ens.rpcUrls,
           ...(config.ens.universalResolver
             ? { universalResolverAddress: config.ens.universalResolver as `0x${string}` }
             : {}),
@@ -70,49 +84,34 @@ const identity: IdentityService =
 // The dashboard lists the store's display copies. With ENS live, refresh them
 // from the chain before serving, so an onchain passport shows as one from the
 // first page load. Decisions never read these copies; every request resolves
-// live.
+// live. A slow RPC delays startup by a few seconds at most.
 let ensPassports = 0;
 if (identity.mode === 'ens') {
-  for (const agent of store.listAgents()) {
-    const resolved = await identity.resolve(agent.id);
-    if (resolved.source === 'ens') ensPassports += 1;
-  }
+  const refreshed = Promise.all(
+    store.listAgents().map(async (agent) => {
+      const resolved = await identity.resolve(agent.id);
+      if (resolved.source === 'ens') ensPassports += 1;
+    }),
+  );
+  await withTimeout(refreshed, STARTUP_ENS_TIMEOUT_MS).catch(() => {
+    console.warn(
+      `[faregate] identity ENS did not answer within ${STARTUP_ENS_TIMEOUT_MS / 1000} seconds at startup; every request still resolves live`,
+    );
+  });
 }
 
-// In live payment mode, confirm the facilitator can settle on this network
-// before accepting a single request. Starting anyway would leave /health
-// reporting payments as live while every paid request failed.
-let paymentServer: x402HTTPResourceServer | undefined;
-let ready = true;
-if (config.payment.mode === 'live') {
-  paymentServer = createHttpResourceServer({ config, store, identity });
-  try {
-    await paymentServer.initialize();
-  } catch (error) {
-    ready = false;
-    const detail = (error instanceof Error ? error.message : String(error))
-      .split('\n')
-      .map((line) => line.replace(/^[\s-]+/, '').trim())
-      .filter(Boolean)
-      .pop();
-    console.error('[faregate] payment facilitator check failed, not starting');
-    console.error(`[faregate]   facilitator  ${config.payment.facilitatorUrl}`);
-    console.error(`[faregate]   network      ${config.payment.network}`);
-    console.error(`[faregate]   reason       ${detail}`);
-    console.error(
-      `[faregate] ${config.payment.facilitatorUrl}/supported must list scheme "exact" on ${config.payment.network}.`,
-    );
-    console.error(
-      `[faregate] Blocky402 testnet is ${BLOCKY402_TESTNET} and mainnet is ${BLOCKY402_MAINNET}. Fix X402_FACILITATOR_URL, or unset FAREGATE_PAY_TO to run with simulated payments.`,
-    );
-    // Set the exit code and let the process wind down, rather than calling
-    // process.exit() while the facilitator request's socket is still closing,
-    // which trips a libuv assertion on Windows.
-    process.exitCode = 1;
-  }
-}
+// Live payments need the facilitator to confirm it settles `exact` on this
+// network. The check runs once the gateway is listening. Until it succeeds,
+// /health says so and paid collection answers 503 with nothing charged. A free
+// host restarts the gateway whenever it wakes, so a facilitator that is briefly
+// unreachable at that moment must not keep the passports, the dashboard and
+// every free decision offline too.
+const paymentServer: x402HTTPResourceServer | undefined =
+  config.payment.mode === 'live' ? createHttpResourceServer({ config, store, identity }) : undefined;
+let paymentReady = paymentServer === undefined;
 
-if (ready) start();
+start();
+if (paymentServer) checkFacilitator(paymentServer);
 
 function start(): void {
   const app = createApp({
@@ -121,18 +120,13 @@ function start(): void {
     dataProvider,
     aiProvider,
     identity,
-    ...(paymentServer ? { paymentServer } : {}),
+    ...(paymentServer ? { paymentServer, paymentReady: () => paymentReady } : {}),
   });
 
   const server = app.listen(config.port, () => {
     const modes = describeModes(config);
     console.log(`[faregate] gateway listening on http://localhost:${config.port}`);
     console.log(`[faregate] network ${config.payment.network}`);
-    if (paymentServer) {
-      console.log(
-        `[faregate] payment  facilitator ${config.payment.facilitatorUrl} supports exact on ${config.payment.network}`,
-      );
-    }
     for (const [subsystem, mode] of Object.entries(modes)) {
       console.log(`[faregate] ${subsystem.padEnd(8)} ${mode}`);
     }
@@ -179,10 +173,52 @@ function start(): void {
   // before Ctrl-C is not the one that gets lost.
   const shutdown = (signal: string): void => {
     console.log(`[faregate] ${signal}, saving state and stopping`);
-    store.flush();
+    try {
+      store.flush();
+    } catch (error) {
+      console.error(
+        `[faregate] state snapshot could not be written: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000).unref();
   };
   process.once('SIGINT', () => shutdown('SIGINT'));
   process.once('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+/** Confirms the facilitator settles on this network, retrying until it does. */
+function checkFacilitator(server: x402HTTPResourceServer): void {
+  withTimeout(server.initialize(), FACILITATOR_TIMEOUT_MS).then(
+    () => {
+      paymentReady = true;
+      console.log(
+        `[faregate] payment  facilitator ${config.payment.facilitatorUrl} supports exact on ${config.payment.network}; paid collection is open`,
+      );
+    },
+    (error: unknown) => {
+      const detail = (error instanceof Error ? error.message : String(error))
+        .split('\n')
+        .map((line) => line.replace(/^[\s-]+/, '').trim())
+        .filter(Boolean)
+        .pop();
+      console.error(
+        `[faregate] payment  facilitator check failed (${detail}); paid collection is paused and checked again in ${FACILITATOR_RETRY_MS / 1000} seconds`,
+      );
+      console.error(
+        `[faregate] payment  ${config.payment.facilitatorUrl}/supported must list scheme "exact" on ${config.payment.network}. Blocky402 testnet is ${BLOCKY402_TESTNET} and mainnet is ${BLOCKY402_MAINNET}.`,
+      );
+      setTimeout(() => checkFacilitator(server), FACILITATOR_RETRY_MS).unref();
+    },
+  );
+}
+
+/** Rejects when `promise` has not settled within `ms`. A late rejection of `promise` is absorbed. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  promise.catch(() => undefined);
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`no answer within ${ms / 1000} seconds`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }

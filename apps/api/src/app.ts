@@ -41,8 +41,9 @@ import { corsAllowList, describeModes, type AppConfig } from './config.ts';
 import type { DataProvider } from './data/provider.ts';
 import { HttpError } from './errors.ts';
 import { actionEnvelopeSchema, authorizeHumanAction } from './human-auth.ts';
+import { canonicalAgentId } from './identity/names.ts';
 import type { IdentityService } from './identity/service.ts';
-import { parsePrompt, parseStructuredQuery } from './query-parser.ts';
+import { isGroundedProposal, parsePrompt, parseStructuredQuery } from './query-parser.ts';
 import { callerKey, rateLimit } from './rate-limit.ts';
 import { createDataRouter } from './routes/data.ts';
 import { GatewayStore } from './store.ts';
@@ -54,12 +55,17 @@ export interface AppDeps {
   aiProvider: AIProvider;
   identity: IdentityService;
   /**
-   * The x402 resource server, already initialised against its facilitator.
-   * Required in live payment mode. The entrypoint initialises it before the
-   * gateway listens, so a facilitator that cannot settle on the configured
-   * network stops startup instead of failing every paid request later.
+   * The x402 resource server. Required in live payment mode. The entrypoint
+   * checks its facilitator once the gateway is listening and reports the
+   * outcome through `paymentReady`.
    */
   paymentServer?: x402HTTPResourceServer;
+  /**
+   * Whether the payment server has confirmed what its facilitator settles.
+   * Until then /health says so and paid collection answers 503, charging
+   * nothing. Omit when the server was initialised before the app was built.
+   */
+  paymentReady?: () => boolean;
   /** Injected so tests can pin time. */
   now?: () => Date;
 }
@@ -144,6 +150,7 @@ function policyDigestInput(input: PolicyInput): Record<string, unknown> {
 export function createApp(deps: AppDeps): Express {
   const { config, store, aiProvider, identity } = deps;
   const now = deps.now ?? (() => new Date());
+  const paymentReady = deps.paymentReady ?? (() => true);
 
   const app = express();
   // The only query parameter the gateway reads is `?limit=`, so Node's plain
@@ -157,6 +164,16 @@ export function createApp(deps: AppDeps): Express {
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', 1);
 
+  // Every answer describes live state. Browsers revalidate it each time, and
+  // the ETag Express adds turns an unchanged answer into a bodiless 304, which
+  // keeps a polling dashboard's traffic small. Shared caches keep no copy.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Cache-Control', 'private, no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+
   // Agents are limited per passport, so one runaway agent cannot starve the
   // others or run up a model bill; humans are limited per caller. A second,
   // per-caller layer on submissions means a caller cannot dodge the passport
@@ -166,7 +183,9 @@ export function createApp(deps: AppDeps): Express {
     windowMs: 60_000,
     keyOf: (req) => {
       const agentId = (req.body as { agentId?: unknown } | undefined)?.agentId;
-      return typeof agentId === 'string' && agentId.length > 0 ? `agent:${agentId}` : callerKey(req);
+      return typeof agentId === 'string' && agentId.length > 0
+        ? `agent:${canonicalAgentId(agentId)}`
+        : callerKey(req);
     },
     now,
   });
@@ -187,14 +206,30 @@ export function createApp(deps: AppDeps): Express {
 
   // --- health ------------------------------------------------------------
 
+  /** What this service is, for anyone who opens the gateway's address in a browser. */
+  app.get('/', (_req: Request, res: Response) => {
+    res.json({
+      service: 'faregate-gateway',
+      summary: 'A permission and payment gateway for AI agents that buy onchain data by the query.',
+      health: '/health',
+      api: 'https://github.com/souravmalviya/web3Faregate/blob/main/docs/openapi.yaml',
+      source: 'https://github.com/souravmalviya/web3Faregate',
+    });
+  });
+
   app.get('/health', (_req: Request, res: Response) => {
+    const paymentWaiting = config.payment.mode === 'live' && !paymentReady();
     res.json({
       ok: true,
       service: 'faregate-gateway',
       time: now().toISOString(),
       modes: describeModes(config),
+      paymentReady: !paymentWaiting,
       notes: [
         config.payment.reason,
+        paymentWaiting
+          ? 'The payment facilitator has not confirmed it can settle yet, so paid collection is paused. The gateway retries every 30 seconds.'
+          : undefined,
         config.data.reason,
         config.ai.reason,
         config.ens.reason,
@@ -223,7 +258,7 @@ export function createApp(deps: AppDeps): Express {
   });
 
   app.get('/agents/:id', (req: Request, res: Response) => {
-    const id = String(req.params.id);
+    const id = canonicalAgentId(String(req.params.id));
     const agent = store.getAgent(id);
     if (!agent) throw new HttpError(404, 'agent_not_found', `No passport for ${id}.`);
     res.json({
@@ -304,7 +339,7 @@ export function createApp(deps: AppDeps): Express {
   }));
 
   app.put('/agents/:id/policy', actionLimiter, wrap(async (req: Request, res: Response) => {
-    const id = String(req.params.id);
+    const id = canonicalAgentId(String(req.params.id));
     const agent = store.getAgent(id);
     if (!agent) throw new HttpError(404, 'agent_not_found', `No passport for ${id}.`);
     if (agent.source === 'ens') {
@@ -351,7 +386,7 @@ export function createApp(deps: AppDeps): Express {
    * no confirmation token: the human already decided.
    */
   app.post('/agents/:id/revoke', actionLimiter, wrap(async (req: Request, res: Response) => {
-    const id = String(req.params.id);
+    const id = canonicalAgentId(String(req.params.id));
     if (!identity.canRevokeLocally(id)) {
       // An ENS passport is revoked by its owner, onchain, with their own
       // wallet. The gateway only reads the chain; it never writes to it.
@@ -401,7 +436,9 @@ export function createApp(deps: AppDeps): Express {
     if (!parsed.success) {
       throw new HttpError(400, 'invalid_request', parsed.error.issues[0]?.message ?? 'Invalid request.');
     }
-    const { agentId, prompt, query: rawQuery, idempotencyKey } = parsed.data;
+    const { prompt, query: rawQuery, idempotencyKey } = parsed.data;
+    // One spelling per passport, so letter case cannot split a budget or a limit.
+    const agentId = canonicalAgentId(parsed.data.agentId);
 
     if (idempotencyKey) {
       const existingId = store.lookupIdempotent(idempotencyKey);
@@ -439,7 +476,9 @@ export function createApp(deps: AppDeps): Express {
     } else {
       const interpretation = await aiProvider.interpret(prompt ?? '');
       const validated = parseStructuredQuery(interpretation.proposal);
-      if (validated.query) {
+      // The proposal must be about a wallet the agent actually named. One the
+      // model filled in is discarded, and the rule-based parser answers.
+      if (validated.query && isGroundedProposal(validated.query, prompt ?? '')) {
         parseResult = { query: validated.query, note: interpretation.rationale };
         interpretedBy = interpretation.provider;
       } else {
@@ -549,7 +588,10 @@ export function createApp(deps: AppDeps): Express {
     if (!request) throw new HttpError(404, 'request_not_found', 'No such request.');
     if (!request.decision) throw new HttpError(409, 'not_evaluated', 'Request has no decision yet.');
     const agent = store.getAgent(request.agentId);
-    const explanation = await aiProvider.explain(request.decision, request.query, agent);
+    // A request that never parsed carries a placeholder query. Explaining it
+    // would name a resource and an address nobody asked for.
+    const understood = !request.decision.reasons.some((reason) => reason.code === 'invalid_query');
+    const explanation = await aiProvider.explain(request.decision, understood ? request.query : null, agent);
     res.json({ requestId: request.id, explanation, provider: aiProvider.name });
   }));
 
@@ -639,12 +681,25 @@ export function createApp(deps: AppDeps): Express {
   if (config.payment.mode === 'live') {
     if (!deps.paymentServer) {
       throw new Error(
-        'Live payment mode needs an initialised payment server. Build it with createHttpResourceServer and await initialize() before createApp.',
+        'Live payment mode needs an initialised payment server. Build it with createHttpResourceServer, initialise it, and pass paymentReady while it initialises.',
       );
     }
-    // Already initialised by the entrypoint, so the middleware must not start
-    // its own background sync, whose failure would go unhandled and end the
-    // process after /health had already reported payments as live.
+    // Until the facilitator has confirmed what it settles, the x402 middleware
+    // has nothing to offer. Collection waits with a 503 instead of failing
+    // inside it, and nothing is charged.
+    app.use('/data', (_req: Request, res: Response, next: NextFunction) => {
+      if (paymentReady()) return next();
+      res.setHeader('Retry-After', '30');
+      res.status(503).json({
+        error: {
+          code: 'payment_unavailable',
+          message:
+            'The payment facilitator has not confirmed it can settle yet, so no fare can be taken. Nothing was charged. Try again in a moment.',
+        },
+      });
+    });
+    // The entrypoint initialises the server itself, so the middleware must not
+    // start its own background sync, whose failure would go unhandled.
     app.use(paymentMiddlewareFromHTTPServer(deps.paymentServer, undefined, undefined, false));
   }
   app.use(
@@ -654,7 +709,9 @@ export function createApp(deps: AppDeps): Express {
   // --- audit -------------------------------------------------------------
 
   app.get('/events', (req: Request, res: Response) => {
-    const limit = Math.min(Number.parseInt(String(req.query.limit ?? '200'), 10) || 200, 1000);
+    // Clamped both ways: a negative or zero limit must not turn into "everything".
+    const requested = Number.parseInt(String(req.query.limit ?? '200'), 10);
+    const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 1000) : 200;
     res.json({ events: store.listEvents(limit) });
   });
 

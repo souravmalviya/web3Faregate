@@ -11,6 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request as httpRequest, type Server } from 'node:http';
 
+import type { x402HTTPResourceServer } from '@x402/core/server';
 import { privateKeyToAccount } from 'viem/accounts';
 
 import { buildActionMessage, canonicalDigest, type HumanAction } from '@faregate/shared';
@@ -49,7 +50,7 @@ function simulatedConfig(): AppConfig {
     ai: { mode: 'simulated', apiKey: undefined, model: 'openai/gpt-4.1-mini', callsPerHour: 300, reason: 'test' },
     ens: {
       mode: 'simulated',
-      rpcUrl: undefined,
+      rpcUrls: [],
       parentName: 'agents.faregate.eth',
       universalResolver: undefined,
       reason: 'test',
@@ -1021,5 +1022,210 @@ test('malformed JSON is a 400, not an internal error', async () => {
     assert.equal(body.error.code, 'invalid_json');
   } finally {
     await h.close();
+  }
+});
+
+// --- names, limits and caching -------------------------------------------------
+
+test('a passport name in any letter case is one passport, with one rate limit and one budget', async () => {
+  const h = await boot({ rateLimit: { requestsPerMinute: 1, actionsPerMinute: 1000 } });
+  try {
+    const shouted = await submit(h, 'TRIAL.Agents.Faregate.ETH', `balance of ${SUBJECT} today`);
+    assert.equal(shouted.status, 201);
+    assert.equal(shouted.body.request.agentId, TRIAL);
+
+    // The usual spelling of the same passport shares its per-passport limit.
+    const plain = await submit(h, TRIAL, `balance of ${SUBJECT} today`);
+    assert.equal(plain.status, 429);
+
+    // And the fare lands on the one ledger the policy engine reads.
+    const collected = await h.json(`/data/${shouted.body.request.id}`);
+    assert.equal(collected.status, 200);
+    assert.equal(h.store.spentTodayMicros(TRIAL, new Date('2026-09-10T12:00:00.000Z')), 10_200);
+  } finally {
+    await h.close();
+  }
+});
+
+test('the audit list never grows past what was asked for, whatever limit a caller sends', async () => {
+  const h = await boot();
+  try {
+    await submit(h, TRIAL, `balance of ${SUBJECT} today`);
+    await submit(h, RESEARCH, `balance of ${SUBJECT} today`);
+    const all = await h.json('/events');
+    assert.ok(all.body.events.length >= 4);
+    for (const limit of ['-1', '0', '1']) {
+      const { body } = await h.json(`/events?limit=${limit}`);
+      assert.equal(body.events.length, 1, `limit=${limit}`);
+    }
+    const junk = await h.json('/events?limit=lots');
+    assert.equal(junk.body.events.length, all.body.events.length);
+  } finally {
+    await h.close();
+  }
+});
+
+test('explaining a request that never parsed does not invent a query for it', async () => {
+  const h = await boot();
+  try {
+    const refused = await submit(h, TRIAL, 'tell me something interesting');
+    assert.equal(refused.body.request.decision.reasons[0].code, 'invalid_query');
+    const { status, body } = await h.json(`/requests/${refused.body.request.id}/explain`);
+    assert.equal(status, 200);
+    assert.match(body.explanation, /could not be resolved to a supported data query/);
+    assert.doesNotMatch(body.explanation, /0x0{40}/);
+  } finally {
+    await h.close();
+  }
+});
+
+test('the gateway root says what it is, and every answer revalidates instead of being cached', async () => {
+  const h = await boot();
+  try {
+    const root = await fetch(`${h.url}/`);
+    assert.equal(root.status, 200);
+    assert.equal(((await root.json()) as { service?: string }).service, 'faregate-gateway');
+    assert.equal(root.headers.get('cache-control'), 'private, no-cache');
+    assert.equal(root.headers.get('x-content-type-options'), 'nosniff');
+
+    // An unchanged list comes back as a bodiless 304, which keeps a polling dashboard cheap.
+    const list = await fetch(`${h.url}/requests`);
+    const etag = list.headers.get('etag');
+    assert.ok(etag);
+    await list.arrayBuffer();
+    // Sent the way a browser revalidates. Node's fetch cannot be used here: with
+    // If-None-Match it adds Cache-Control: no-cache, which rules out a 304.
+    const revalidated = await new Promise<number>((resolve, reject) => {
+      const req = httpRequest(
+        `${h.url}/requests`,
+        { headers: { 'if-none-match': etag, 'cache-control': 'max-age=0' } },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(revalidated, 304);
+  } finally {
+    await h.close();
+  }
+});
+
+// --- the model must not invent a subject -------------------------------------
+
+/** A model that answers every ask with one fixed proposal, the way a guessing model might. */
+function modelProposing(proposal: Record<string, unknown>): AIProvider {
+  const fallback = new RuleBasedAIProvider();
+  return {
+    name: 'openrouter',
+    describe: () => 'test model',
+    interpret: async () => ({ proposal, rationale: 'test model proposal', provider: 'openrouter' }),
+    explain: (decision, query, agent) => fallback.explain(decision, query, agent),
+    analyze: (query, data, provenance) => fallback.analyze(query, data, provenance),
+  };
+}
+
+const ZERO = '0x0000000000000000000000000000000000000000';
+
+test('a model that fills in the zero address for a request naming no wallet is overruled', async () => {
+  const h = await boot({}, undefined, modelProposing({ resource: 'wallet.activity', address: ZERO, lookbackDays: 30 }));
+  try {
+    const { status, body } = await submit(h, RESEARCH, 'tell me something interesting about wallets');
+    assert.equal(status, 403);
+    assert.equal(body.interpretedBy, 'rule-based');
+    assert.deepEqual(body.request.decision.reasons.map((r: any) => r.code), ['invalid_query']);
+  } finally {
+    await h.close();
+  }
+});
+
+test('a model that swaps in an address the agent never wrote is overruled by the address it did write', async () => {
+  const other = '0x1111111111111111111111111111111111111111';
+  const h = await boot({}, undefined, modelProposing({ resource: 'wallet.activity', address: other, lookbackDays: 30 }));
+  try {
+    const { status, body } = await submit(h, RESEARCH, `Analyze the recent activity of ${SUBJECT} over the last month`);
+    assert.equal(status, 201);
+    assert.equal(body.interpretedBy, 'rule-based');
+    assert.equal(body.request.query.address, SUBJECT.toLowerCase());
+  } finally {
+    await h.close();
+  }
+});
+
+test('a transaction hash is not read as a wallet, and only market data may name no wallet', async () => {
+  const h = await boot();
+  try {
+    const hash = `0x${'ab'.repeat(32)}`;
+    const fromHash = await submit(h, RESEARCH, `Show the transfers in ${hash}`);
+    assert.deepEqual(fromHash.body.request.decision.reasons.map((r: any) => r.code), ['invalid_query']);
+
+    const zeroWallet = await h.json('/requests', {
+      method: 'POST',
+      body: JSON.stringify({ agentId: RESEARCH, query: { resource: 'wallet.balances', address: ZERO, lookbackDays: 1 } }),
+    });
+    assert.deepEqual(zeroWallet.body.request.decision.reasons.map((r: any) => r.code), ['invalid_query']);
+
+    // Market data is not about a wallet: the query parses, and the passport's scope refuses it.
+    const markets = await h.json('/requests', {
+      method: 'POST',
+      body: JSON.stringify({ agentId: RESEARCH, query: { resource: 'protocol.markets', address: ZERO, lookbackDays: 1 } }),
+    });
+    assert.deepEqual(markets.body.request.decision.reasons.map((r: any) => r.code), ['resource_not_allowed']);
+  } finally {
+    await h.close();
+  }
+});
+
+// --- a facilitator that has not answered yet ---------------------------------
+
+test('while the payment facilitator has not answered, collection waits with a 503 and health says why', async () => {
+  let ready = false;
+  // Enough of an x402 server for the middleware to mount and pass requests on.
+  const paymentServer = {
+    routes: {},
+    server: { hasExtension: () => true, registerExtension: () => undefined },
+    initialize: async () => undefined,
+    requiresPayment: () => false,
+  } as unknown as x402HTTPResourceServer;
+  const store = new GatewayStore();
+  seedDemoData(store, new Date('2026-09-10T00:00:00.000Z'));
+  const config = simulatedConfig();
+  const app = createApp({
+    config: { ...config, payment: { ...config.payment, mode: 'live', payTo: '0.0.10457565' } },
+    store,
+    dataProvider: new SimulatedDataProvider(),
+    aiProvider: new RuleBasedAIProvider(),
+    identity: new LocalIdentityService(store),
+    paymentServer,
+    paymentReady: () => ready,
+    now: () => new Date('2026-09-10T12:00:00.000Z'),
+  });
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, () => resolve(s));
+  });
+  const address = server.address();
+  const url = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+  const missing = `${url}/data/00000000-0000-4000-8000-000000000000`;
+  try {
+    const waiting = await fetch(missing);
+    assert.equal(waiting.status, 503);
+    assert.equal(waiting.headers.get('retry-after'), '30');
+    assert.equal(((await waiting.json()) as any).error.code, 'payment_unavailable');
+
+    const paused = (await (await fetch(`${url}/health`)).json()) as any;
+    assert.equal(paused.paymentReady, false);
+    assert.ok(paused.notes.some((note: string) => /facilitator/.test(note)));
+
+    ready = true;
+    const open = (await (await fetch(`${url}/health`)).json()) as any;
+    assert.equal(open.paymentReady, true);
+    assert.ok(!open.notes.some((note: string) => /facilitator/.test(note)));
+    const through = await fetch(missing);
+    assert.notEqual(through.status, 503);
+    await through.arrayBuffer();
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });

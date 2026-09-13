@@ -45,6 +45,8 @@ export interface StoreOptions {
   file?: string;
   /** Requests kept in memory. Past this, the oldest finished ones are dropped. */
   requestCap?: number;
+  /** How long after a change the snapshot is written. */
+  saveDelayMs?: number;
 }
 
 /** The on-disk shape. Versioned so a future migration has something to check. */
@@ -81,8 +83,12 @@ function trimOldest(collection: Set<string> | Map<string, unknown>, cap: number)
   }
 }
 
-/** How long after a change the snapshot is written. Coalesces bursts of writes. */
-const SAVE_DELAY_MS = 50;
+/**
+ * How long after a change the snapshot is written. A burst of changes becomes
+ * one write, so a busy gateway serialises its state at most once a second.
+ * Shutdown writes immediately, so a clean stop loses nothing.
+ */
+const DEFAULT_SAVE_DELAY_MS = 1_000;
 
 export class GatewayStore {
   private readonly agents = new Map<AgentId, Agent>();
@@ -101,11 +107,13 @@ export class GatewayStore {
 
   private readonly file: string | null;
   private readonly requestCap: number;
+  private readonly saveDelayMs: number;
   private saveTimer: NodeJS.Timeout | null = null;
 
   constructor(options: StoreOptions = {}) {
     this.file = options.file ?? null;
     this.requestCap = Math.max(1, Math.floor(options.requestCap ?? DEFAULT_REQUEST_CAP));
+    this.saveDelayMs = Math.max(0, options.saveDelayMs ?? DEFAULT_SAVE_DELAY_MS);
     if (this.file) this.load();
   }
 
@@ -293,7 +301,9 @@ export class GatewayStore {
   }
 
   listEvents(limit = 200): AuditEvent[] {
-    return this.audit.slice(-limit).reverse();
+    // slice(-0) is the whole array, so zero and below are answered explicitly.
+    const count = Math.floor(limit);
+    return count > 0 ? this.audit.slice(-count).reverse() : [];
   }
 
   /** Every event about one request, oldest first: the request's own timeline. */
@@ -317,8 +327,15 @@ export class GatewayStore {
     if (!this.file || this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
-      this.flush();
-    }, SAVE_DELAY_MS);
+      try {
+        this.flush();
+      } catch (error) {
+        // A failed write must not end the process. The next change tries again.
+        console.error(
+          `[faregate] state snapshot could not be written: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }, this.saveDelayMs);
     // A pending save must not keep a finishing process alive; `flush()` is
     // called explicitly on shutdown.
     this.saveTimer.unref();

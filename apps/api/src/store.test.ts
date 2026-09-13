@@ -121,7 +121,7 @@ test('state survives a restart through the snapshot file, including a revocation
 test('changes are written automatically shortly after they happen', async () => {
   const file = scratchFile();
   try {
-    const store = new GatewayStore({ file });
+    const store = new GatewayStore({ file, saveDelayMs: 20 });
     seedDemoData(store);
     await new Promise((resolve) => setTimeout(resolve, 150));
     assert.ok(existsSync(file), 'snapshot written without an explicit flush');
@@ -145,6 +145,15 @@ test('a corrupt snapshot is set aside and the store starts empty', (t) => {
   } finally {
     rmSync(path.dirname(file), { recursive: true, force: true });
   }
+});
+
+test('asking for zero or fewer audit events returns none, not the whole log', () => {
+  const store = new GatewayStore();
+  store.recordEvent({ type: 'agent.created', actor: 'human' });
+  store.recordEvent({ type: 'agent.revoked', actor: 'human' });
+  assert.equal(store.listEvents(0).length, 0);
+  assert.equal(store.listEvents(-3).length, 0);
+  assert.equal(store.listEvents(1)[0]?.type, 'agent.revoked');
 });
 
 test('a store without a file never touches the disk', () => {

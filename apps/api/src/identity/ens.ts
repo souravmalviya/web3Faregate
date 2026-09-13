@@ -24,7 +24,14 @@
  *   faregate.expires_at          ISO 8601, or empty for no expiry
  */
 
-import { createPublicClient, http, type Address as EvmAddress, type PublicClient } from 'viem';
+import {
+  createPublicClient,
+  fallback,
+  http,
+  type Address as EvmAddress,
+  type PublicClient,
+  type Transport,
+} from 'viem';
 import { sepolia } from 'viem/chains';
 import { normalize } from 'viem/ens';
 
@@ -59,7 +66,8 @@ export interface EnsPassport {
 }
 
 export interface EnsResolverOptions {
-  rpcUrl: string;
+  /** Sepolia RPCs. With more than one, a call that fails on one moves to the next. */
+  rpcUrls: string[];
   universalResolverAddress?: EvmAddress;
   /** Injected for tests. */
   client?: PublicClient;
@@ -106,22 +114,25 @@ function parseExpiry(value: string | null): string | null {
 export class EnsPassportResolver {
   private readonly client: PublicClient;
   private readonly universalResolverAddress: EvmAddress;
-  private readonly rpcUrl: string;
+  private readonly rpcUrls: string[];
 
   constructor(options: EnsResolverOptions) {
-    this.rpcUrl = options.rpcUrl;
+    if (options.rpcUrls.length === 0 && !options.client) {
+      throw new EnsResolverError('not_configured', 'EnsPassportResolver needs at least one RPC URL.');
+    }
+    this.rpcUrls = options.rpcUrls;
     this.universalResolverAddress =
       options.universalResolverAddress ?? ENSV2_SEPOLIA_UNIVERSAL_RESOLVER;
     this.client =
       options.client ??
       createPublicClient({
         chain: sepolia,
-        transport: http(options.rpcUrl, { timeout: options.timeoutMs ?? 10_000 }),
+        transport: transportFor(options.rpcUrls, options.timeoutMs ?? 6_000),
       });
   }
 
   describe(): string {
-    return `ENSv2 on Sepolia via ${redactRpc(this.rpcUrl)}, resolver ${this.universalResolverAddress}`;
+    return `ENSv2 on Sepolia via ${this.rpcUrls.map(redactRpc).join(', falling back to ')}, resolver ${this.universalResolverAddress}`;
   }
 
   private async text(name: string, key: string): Promise<string | null> {
@@ -201,6 +212,19 @@ export class EnsPassportResolver {
 
     return { agent, policy };
   }
+}
+
+/**
+ * One public RPC would make every agent's identity depend on one provider, and
+ * identity fails closed. With several, a call that fails on one endpoint moves
+ * on to the next, so one provider's outage refuses nobody. Each endpoint gets
+ * one quick retry, which keeps the wait bounded when every endpoint is down.
+ */
+function transportFor(urls: readonly string[], timeoutMs: number): Transport {
+  const transports = urls.map((url) => http(url, { timeout: timeoutMs, retryCount: 1 }));
+  const [first] = transports;
+  if (transports.length === 1 && first) return first;
+  return fallback(transports, { retryCount: 0 });
 }
 
 /** Keeps API keys embedded in RPC URLs out of logs and /health. */

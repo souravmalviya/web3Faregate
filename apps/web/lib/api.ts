@@ -22,6 +22,9 @@ import {
 /** No trailing slash, so a pasted `https://gateway.example/` still builds `/health`, not `//health`. */
 export const GATEWAY_URL = (process.env.NEXT_PUBLIC_FAREGATE_GATEWAY_URL ?? 'http://localhost:8402').replace(/\/+$/, '');
 
+/** A gateway on this machine is started by hand; a hosted one may be asleep and waking. */
+export const GATEWAY_IS_LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(GATEWAY_URL);
+
 export type SubsystemMode = 'live' | 'simulated';
 
 export interface Health {
@@ -31,6 +34,8 @@ export interface Health {
   network: string;
   parentName: string;
   signedActions: boolean;
+  /** False while live payments wait for the facilitator to confirm what it settles. */
+  paymentReady?: boolean;
   persistence: string;
   modes: Record<'payment' | 'data' | 'ai' | 'ens', SubsystemMode>;
   notes: string[];
@@ -79,7 +84,9 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     // Only a request with a body declares JSON. A bodiless GET then stays a
     // simple request, so polling a hosted gateway sends no preflight.
     headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), ...(init?.headers ?? {}) },
-    cache: 'no-store',
+    // Revalidate every time. The gateway sends an ETag, so an unchanged answer
+    // comes back as a bodiless 304 instead of the whole list again.
+    cache: 'no-cache',
   });
   const body = (await response.json().catch(() => ({}))) as { error?: ApiError } & T;
   if (!response.ok) {

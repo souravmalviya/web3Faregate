@@ -9,7 +9,7 @@ import {
 } from '@faregate/shared';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { GatewayError, api, type AgentWithPolicy, type Health, type Signer } from '@/lib/api';
+import { GATEWAY_IS_LOCAL, GatewayError, api, type AgentWithPolicy, type Health, type Signer } from '@/lib/api';
 import {
   EMPTY_WALLET,
   EXPECTED_CHAIN,
@@ -28,6 +28,18 @@ import {
  */
 const POLL_MS = 2000;
 
+/**
+ * A free host sleeps when idle and holds the first request while it starts,
+ * which takes up to a minute. For that long, a hosted gateway that does not
+ * answer is waking, not offline.
+ */
+const WAKE_GRACE_MS = 90_000;
+
+/** How long the first answer may take before the console says the gateway is waking. */
+const SLOW_START_MS = 4_000;
+
+export type GatewayState = 'connecting' | 'online' | 'waking' | 'offline';
+
 export interface Flash {
   id: number;
   text: string;
@@ -42,6 +54,8 @@ export interface ConsoleState {
   requests: AccessRequest[];
   events: AuditEvent[];
   error: string | null;
+  /** Whether the gateway answers, is waking from sleep, or cannot be reached. */
+  gatewayState: GatewayState;
   refresh: () => Promise<void>;
   wallet: WalletState;
   connect: () => Promise<void>;
@@ -91,7 +105,15 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const [gatewayState, setGatewayState] = useState<GatewayState>('connecting');
+  const waitingSince = useRef<number | null>(null);
+  const inFlight = useRef(false);
+
   const refresh = useCallback(async () => {
+    // A sleeping host holds a request open while it starts. Polls do not pile
+    // up behind it: while one refresh is waiting, the next tick is skipped.
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
       const [h, a, r, e] = await Promise.all([api.health(), api.agents(), api.requests(), api.events(120)]);
       setHealth(h);
@@ -99,18 +121,32 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
       setRequests(r);
       setEvents(e);
       setError(null);
+      waitingSince.current = null;
+      setGatewayState('online');
     } catch (err) {
       setHealth(null);
       setError(err instanceof Error ? err.message : 'Gateway unreachable.');
+      const since = (waitingSince.current ??= Date.now());
+      setGatewayState(!GATEWAY_IS_LOCAL && Date.now() - since < WAKE_GRACE_MS ? 'waking' : 'offline');
     } finally {
+      inFlight.current = false;
       setLoaded(true);
     }
   }, []);
 
   useEffect(() => {
+    waitingSince.current = Date.now();
     void refresh();
     const timer = setInterval(() => void refresh(), POLL_MS);
-    return () => clearInterval(timer);
+    // The first request to a sleeping host can take a minute. Say the gateway
+    // is waking rather than showing a silent loading state for that long.
+    const slowStart = setTimeout(() => {
+      setGatewayState((state) => (state === 'connecting' && !GATEWAY_IS_LOCAL ? 'waking' : state));
+    }, SLOW_START_MS);
+    return () => {
+      clearInterval(timer);
+      clearTimeout(slowStart);
+    };
   }, [refresh]);
 
   const [wallet, setWallet] = useState<WalletState>(EMPTY_WALLET);
@@ -179,6 +215,7 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
       requests,
       events,
       error,
+      gatewayState,
       refresh,
       wallet,
       connect,
@@ -191,7 +228,7 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
       notify,
       agentLabel,
     }),
-    [loaded, health, agents, requests, events, error, refresh, wallet, connect, switchChain, canAct, busy, run, flash, notify, agentLabel],
+    [loaded, health, agents, requests, events, error, gatewayState, refresh, wallet, connect, switchChain, canAct, busy, run, flash, notify, agentLabel],
   );
 
   return <ConsoleContext.Provider value={value}>{children}</ConsoleContext.Provider>;

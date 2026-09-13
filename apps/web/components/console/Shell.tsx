@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { GATEWAY_URL, shortAddress } from '@/lib/api';
+import { GATEWAY_IS_LOCAL, GATEWAY_URL, shortAddress } from '@/lib/api';
 import { EXPECTED_CHAIN } from '@/lib/wallet';
 
 import { Button, LogoMark, Notice } from '../ui';
@@ -26,7 +26,7 @@ const SUBSYSTEMS = [
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { requests, health, error, wallet } = useConsole();
+  const { requests, health, error, wallet, gatewayState } = useConsole();
   const pathname = usePathname();
   const waiting = requests.filter((r) => r.status === 'awaiting_approval').length;
 
@@ -74,7 +74,14 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-16 pt-8">
-        {error ? (
+        {gatewayState === 'waking' ? (
+          <div className="mb-6">
+            <Notice tone="hold">
+              Waking the gateway at <span className="font-mono">{GATEWAY_URL}</span>. It runs on free hosting that
+              sleeps after 15 minutes without visitors, and starting takes up to a minute. This page connects by itself.
+            </Notice>
+          </div>
+        ) : error ? (
           <div className="mb-6">
             <GatewayUnreachable />
           </div>
@@ -110,19 +117,18 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-const LOCAL_GATEWAY = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(GATEWAY_URL);
-
 /**
- * A browser cannot tell a sleeping gateway from one that refuses this page's
- * origin: both are a failed fetch. So a hosted gateway gets both causes, and
- * the exact origin to allow.
+ * Shown once a gateway has not answered for longer than waking takes. A
+ * browser cannot tell a gateway that is down from one that refuses this
+ * page's origin, since both are a failed fetch, so a hosted gateway gets both
+ * causes and the exact origin to allow.
  */
 function GatewayUnreachable() {
   // Read after mount: the page is prerendered, where there is no window.
   const [origin, setOrigin] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
 
-  if (LOCAL_GATEWAY) {
+  if (GATEWAY_IS_LOCAL) {
     return (
       <Notice tone="stop">
         Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. Start it with{' '}
@@ -132,20 +138,28 @@ function GatewayUnreachable() {
   }
   return (
     <Notice tone="stop">
-      Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. A free instance takes up to a
-      minute to wake, and this page retries every 2 seconds. If{' '}
+      Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. If{' '}
       <a href={`${GATEWAY_URL}/health`} target="_blank" rel="noreferrer" className="font-mono underline">
         /health
       </a>{' '}
-      opens in a new tab but this message stays, the gateway is refusing this page: add{' '}
+      opens in a new tab, the gateway is refusing this page: add{' '}
       <code className="font-mono">{origin ?? 'this page’s address'}</code> to{' '}
-      <code className="font-mono">FAREGATE_CORS_ORIGIN</code> on the gateway.
+      <code className="font-mono">FAREGATE_CORS_ORIGIN</code> on the gateway. If it does not open, the gateway is down.
+      Retrying every 2 seconds.
     </Notice>
   );
 }
 
 function SystemReadout() {
-  const { health, loaded } = useConsole();
+  const { health, loaded, gatewayState } = useConsole();
+  if (gatewayState === 'waking') {
+    return (
+      <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-hold">
+        <span className="h-[7px] w-[7px] bg-hold" aria-hidden />
+        Waking gateway
+      </span>
+    );
+  }
   if (!loaded) return <span className="text-[12.5px] text-muted">Connecting</span>;
   if (!health) {
     return (

@@ -167,7 +167,8 @@ test('the API key travels as a Bearer header, never in the URL', async () => {
 // --- simulated -----------------------------------------------------------
 
 test('simulated data is deterministic for the same query and stamped as simulated', async () => {
-  const provider = new SimulatedDataProvider();
+  // A pinned clock: with the real one, two calls that straddle a second differ.
+  const provider = new SimulatedDataProvider({ now: () => new Date('2026-09-10T12:00:00.000Z') });
   const a = await provider.fetch(query({ resource: 'wallet.activity' }));
   const b = await provider.fetch(query({ resource: 'wallet.activity' }));
   assert.deepEqual((a.data as { events: unknown[] }).events, (b.data as { events: unknown[] }).events);

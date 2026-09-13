@@ -391,6 +391,12 @@ async function safeText(response: Response): Promise<string> {
  */
 export class SimulatedDataProvider implements DataProvider {
   readonly name = 'simulated' as const;
+  private readonly now: () => Date;
+
+  /** `now` is injected so two calls in a test get the same timestamps. */
+  constructor(options: { now?: () => Date } = {}) {
+    this.now = options.now ?? (() => new Date());
+  }
 
   describe(): string {
     return 'Deterministic simulated data. Not sourced from any chain.';
@@ -398,13 +404,14 @@ export class SimulatedDataProvider implements DataProvider {
 
   async fetch(query: ResourceQuery): Promise<DataResult> {
     const seed = hash(`${query.resource}:${query.address}:${query.lookbackDays}`);
+    const at = this.now();
     const pick = <T>(items: readonly T[], salt: number): T =>
       items[(seed + salt) % items.length] as T;
 
     const symbols = ['USDC', 'WETH', 'DAI', 'WBTC', 'LINK'] as const;
     const events = Array.from({ length: 3 + (seed % 5) }, (_, i) => ({
       hash: `0x${((seed + i) * 2654435761).toString(16).padStart(64, '0').slice(0, 64)}`,
-      timestampSeconds: Math.floor(Date.now() / 1000) - i * 3600 * 7,
+      timestampSeconds: Math.floor(at.getTime() / 1000) - i * 3600 * 7,
       symbol: pick(symbols, i),
       amountUsd: Number((((seed % 900) + 100 + i * 37) / 3).toFixed(2)),
       kind: pick(['deposit', 'withdraw', 'borrow', 'repay'] as const, i),
@@ -423,7 +430,7 @@ export class SimulatedDataProvider implements DataProvider {
       provenance: {
         provider: 'simulated',
         source: 'faregate-simulated-provider',
-        queriedAt: new Date().toISOString(),
+        queriedAt: at.toISOString(),
         simulated: true,
       },
     };

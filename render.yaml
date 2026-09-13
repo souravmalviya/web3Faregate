@@ -16,6 +16,19 @@ services:
     runtime: node
     plan: free
     branch: main
+    # Redeploy only when the gateway itself can have changed. Every deploy
+    # restarts the process and empties its request queue and ledger, so a push
+    # that only touches docs, the dashboard, the agent or the scripts leaves
+    # the running gateway, and the settled fares it holds, alone.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/shared/**
+        - package.json
+        - package-lock.json
+        - tsconfig.base.json
+        - .node-version
+        - render.yaml
     # Only the gateway and the shared package are installed; the dashboard and
     # its dependencies are not needed here. --include=dev keeps tsc available
     # for the shared build whatever NODE_ENV the host sets.

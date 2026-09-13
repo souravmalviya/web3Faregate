@@ -12,7 +12,8 @@ import { Button, LogoMark, Notice } from '../ui';
 import { useConsole } from './ConsoleProvider';
 
 const NAV = [
-  { href: '/', label: 'Requests' },
+  { href: '/', label: 'Home' },
+  { href: '/requests', label: 'Requests' },
   { href: '/passports', label: 'Passports' },
   { href: '/ledger', label: 'Ledger' },
   { href: '/audit', label: 'Audit log' },
@@ -29,17 +30,52 @@ export function Shell({ children }: { children: ReactNode }) {
   const { requests, health, error, wallet, gatewayState } = useConsole();
   const pathname = usePathname();
   const waiting = requests.filter((r) => r.status === 'awaiting_approval').length;
+  // The front page draws its own full-width bands; console pages sit in one column.
+  const home = pathname === '/';
+  const hasNotice =
+    gatewayState === 'waking' || Boolean(error) || Boolean(wallet.error) || Boolean(health && health.notes.length > 0);
+
+  const notices = (
+    <>
+      {gatewayState === 'waking' ? (
+        <div className="mb-6">
+          <Notice tone="hold">
+            Waking the gateway at <span className="font-mono">{GATEWAY_URL}</span>. It runs on free hosting that
+            sleeps after 15 minutes without visitors, and starting takes up to a minute. This page connects by itself.
+          </Notice>
+        </div>
+      ) : error ? (
+        <div className="mb-6">
+          <GatewayUnreachable />
+        </div>
+      ) : null}
+      {wallet.error ? (
+        <div className="mb-6">
+          <Notice tone="stop">{wallet.error}</Notice>
+        </div>
+      ) : null}
+      {health && health.notes.length > 0 ? (
+        <div className="mb-6">
+          <Notice tone="hold">
+            {health.notes.map((note, i) => (
+              <div key={i}>{note}</div>
+            ))}
+          </Notice>
+        </div>
+      ) : null}
+    </>
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-rule bg-sheet">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-8 gap-y-2 px-6 py-2 md:h-14 md:flex-nowrap md:py-0">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Faregate requests">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="Faregate home">
             <LogoMark />
             <span className="font-display text-[21px] font-semibold leading-none text-ink">Faregate</span>
           </Link>
 
-          <nav aria-label="Console" className="flex items-stretch gap-6 self-stretch">
+          <nav aria-label="Console" className="flex flex-wrap items-stretch gap-x-6 self-stretch">
             {NAV.map((item) => {
               const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
               return (
@@ -52,7 +88,7 @@ export function Shell({ children }: { children: ReactNode }) {
                   }`}
                 >
                   {item.label}
-                  {item.href === '/' && waiting > 0 ? (
+                  {item.href === '/requests' && waiting > 0 ? (
                     <span
                       className="tnum rounded-[2px] bg-hold px-1 font-mono text-[11px] leading-[16px] text-white"
                       title={`${waiting} waiting for your signature`}
@@ -73,35 +109,17 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-16 pt-8">
-        {gatewayState === 'waking' ? (
-          <div className="mb-6">
-            <Notice tone="hold">
-              Waking the gateway at <span className="font-mono">{GATEWAY_URL}</span>. It runs on free hosting that
-              sleeps after 15 minutes without visitors, and starting takes up to a minute. This page connects by itself.
-            </Notice>
-          </div>
-        ) : error ? (
-          <div className="mb-6">
-            <GatewayUnreachable />
-          </div>
-        ) : null}
-        {wallet.error ? (
-          <div className="mb-6">
-            <Notice tone="stop">{wallet.error}</Notice>
-          </div>
-        ) : null}
-        {health && health.notes.length > 0 ? (
-          <div className="mb-6">
-            <Notice tone="hold">
-              {health.notes.map((note, i) => (
-                <div key={i}>{note}</div>
-              ))}
-            </Notice>
-          </div>
-        ) : null}
-        {children}
-      </main>
+      {home ? (
+        <main className="w-full flex-1">
+          {hasNotice ? <div className="mx-auto max-w-[1200px] px-6 pt-6">{notices}</div> : null}
+          {children}
+        </main>
+      ) : (
+        <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-16 pt-8">
+          {notices}
+          {children}
+        </main>
+      )}
 
       <footer className="border-t border-rule">
         <div className="mx-auto flex max-w-[1200px] flex-wrap gap-x-6 gap-y-1 px-6 py-4 font-mono text-[11.5px] text-muted">

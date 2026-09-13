@@ -60,8 +60,7 @@ export function RequestLedger() {
       {requests.length === 0 ? (
         <Empty title="No requests yet">
           Agents send requests to the gateway on their own. Run{' '}
-          <code className="font-mono text-[12.5px] text-ink">npm run agent</code>, or send a test request from the panel
-          on the right.
+          <code className="font-mono text-[12.5px] text-ink">npm run agent</code>, or send one from Start here above.
         </Empty>
       ) : rows.length === 0 ? (
         <Empty title={EMPTY_FILTER[filter]} />

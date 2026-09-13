@@ -103,6 +103,20 @@ body {
   animation: arrive 2.4s ease-out;
 }
 
+/* A verdict stamp lands when the gate decides: the one moment on the front page that moves. */
+@keyframes land {
+  from {
+    transform: scale(1.35) rotate(-4deg);
+  }
+  to {
+    transform: none;
+  }
+}
+.land {
+  display: inline-block;
+  animation: land 0.3s ease-out;
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

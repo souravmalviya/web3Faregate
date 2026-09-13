@@ -78,13 +78,23 @@ export interface ApiError {
 export class GatewayError extends Error {
   readonly status: number;
   readonly code: string;
+  /** The parsed answer. A refusal still carries the request the gateway recorded. */
+  readonly body: unknown;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, body: unknown = null) {
     super(message);
     this.name = 'GatewayError';
     this.status = status;
     this.code = code;
+    this.body = body;
   }
+}
+
+/** The request a refusal recorded, when the gateway sent it back, so a page can show where it stopped. */
+export function refusedRequest(err: unknown): AccessRequest | null {
+  if (!(err instanceof GatewayError) || err.status !== 403) return null;
+  const request = (err.body as { request?: AccessRequest } | null)?.request;
+  return request && typeof request.id === 'string' ? request : null;
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
@@ -104,6 +114,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
       response.status,
       error?.code ?? 'http_error',
       error?.message ?? `Gateway returned HTTP ${response.status}.`,
+      body,
     );
   }
   return body;

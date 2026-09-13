@@ -108,7 +108,8 @@ the gateway. Defences, each traceable to a file:
 - Model proposals re-validated; model summaries grounding-checked
   (`ai/provider.ts`).
 - Identity fails closed when ENS is unreachable (`identity/service.ts`).
-- No custody, no keys, no transactions from the gateway.
+- No custody and no transactions from the gateway. On the hosted testnet demo,
+  an optional demo agent beside it holds the agent's test key (`SECURITY.md`).
 
 Limits are stated in `SECURITY.md`: single-machine snapshot persistence, and
 signatures prove who acted rather than who was entitled to.
@@ -209,7 +210,8 @@ carries provenance saying which.
 **What is decentralised, what is centralised?** Identity, payment settlement
 and data indexing are on decentralised infrastructure. The policy engine and
 the spend ledger run in the gateway, which the owner operates. The gateway
-holds no keys and no funds.
+holds no funds; on the hosted demo, a demo agent beside it holds only the
+agent's testnet key.
 
 **Trust assumptions?** The facilitator verifies and settles honestly; the
 Graph gateway returns what the subgraph indexed; the owner's wallet is the

@@ -21,4 +21,7 @@ Short version:
 - Agents are rate-limited per passport; humans per caller. Model calls are
   capped per hour across every caller; past the cap the rule-based parser
   answers.
-- No custody, no keys in the gateway, no transaction ever sent by it.
+- No custody, and no transaction ever sent by the gateway. The policy engine
+  and the payment gate hold no key. On the hosted testnet demo, an optional
+  demo agent beside the gateway holds the agent's test key and pays like any
+  agent, so approving is the only step.

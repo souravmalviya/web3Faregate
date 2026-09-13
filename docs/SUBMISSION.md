@@ -74,7 +74,10 @@ path:
    before a price is quoted.
 
 **What is real.** The dashboard's top bar shows, for each subsystem, whether
-it is live or simulated. Nothing simulated is ever shown as a chain fact.
+it is live or simulated. Nothing simulated is ever shown as a chain fact. On
+the live dashboard, approving is the only step: a demo agent beside the gateway
+pays for the request from its own testnet account, and the data arrives within
+seconds.
 
 ## How it's made
 

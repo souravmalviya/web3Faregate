@@ -153,3 +153,19 @@ simulated output.
 
 **Why.** The alternative, silently substituting fake data when a real
 integration breaks, is the one thing a judge must never be able to catch.
+
+## 14. A hosted demo can run the agent beside the gateway
+
+**Choice.** `FAREGATE_DEMO_AGENT` runs a demo agent in the gateway's process on
+the hosted testnet demo, holding the agent's throwaway testnet key, so a
+visitor's approval completes in one click instead of waiting for a terminal
+command.
+
+**Alternatives.** Keep the agent only on the operator's machine, which kept
+every key off the host but left a visitor's approved request waiting for a
+command nobody would run. Or let the gateway pay, which would erase the point
+that the agent pays for its own data.
+
+**Guards.** It is a client of the public x402 route like any agent, collects
+only for the listed passports within their onchain daily limits, refuses any
+network but Hedera testnet, and is off unless switched on.

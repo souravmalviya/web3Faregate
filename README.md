@@ -157,7 +157,10 @@ per-bounty breakdown with file references and honest status is in
 - Agents are rate-limited per passport; humans per caller. Model calls are
   capped per hour across everyone, so an open gateway cannot be made to run up
   a model bill.
-- No custody, no keys in the gateway, no transaction ever sent by the gateway.
+- No custody, and no transaction ever sent by the gateway. The policy engine and
+  the payment gate hold no key; the agent pays from its own account. On the
+  hosted testnet demo, an optional demo agent beside the gateway holds the
+  agent's test key so that approving is the only step (`SECURITY.md`).
 
 Threat model and limits: [SECURITY.md](SECURITY.md). Why it is built this way:
 [docs/DECISIONS.md](docs/DECISIONS.md).
@@ -207,7 +210,9 @@ Turn subsystems live one at a time in `.env`:
 | `FAREGATE_PAY_TO_PRIVATE_KEY` | unset | Read only by `scripts/hedera/*`, never by the gateway |
 | `FAREGATE_ASSET` | `0.0.429274` (testnet USDC) | HTS token to charge in |
 | `FAREGATE_PAYMENT_TIMEOUT_SECONDS` | `120` | How long a quote stays valid |
-| `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` | unset | The demo agent's paying account (agent process only) |
+| `HEDERA_ACCOUNT_ID`, `HEDERA_PRIVATE_KEY` | unset | The agent's paying testnet account: read by `npm run agent`, and by the gateway only when `FAREGATE_DEMO_AGENT` is on |
+| `FAREGATE_DEMO_AGENT` | `false` | Run a demo agent beside the gateway that pays for cleared requests, so approving is the only step. Hedera testnet only |
+| `FAREGATE_DEMO_AGENT_PASSPORTS` | the two demo passports | Passports the demo agent collects for |
 | `GRAPH_API_KEY` | unset (data simulated) | Subgraph Studio key |
 | `GRAPH_SUBGRAPHS` | Aave v3, Compound v3, Spark on Ethereum | `protocol=subgraphId` pairs on the Messari standard schema |
 | `OPENROUTER_API_KEY` | unset (AI rule-based) | OpenRouter key |
@@ -278,6 +283,8 @@ and CI runs every check on each push. Step by step in
 
 Live now: [web3-faregate-web.vercel.app](https://web3-faregate-web.vercel.app),
 talking to [faregate-gateway.onrender.com](https://faregate-gateway.onrender.com/health).
+There, approving is the only step: a demo agent beside the gateway pays for
+the request from its own testnet account and the data arrives within seconds.
 
 ## Limitations
 

@@ -187,6 +187,18 @@ A standalone Node process. It narrates each step because it is what runs
 during the demo. `--request <id>` makes it present a quote it already holds,
 which is how the revocation moment is shown.
 
+## The demo agent
+
+`apps/api/src/agent/demo-agent.ts`, off unless `FAREGATE_DEMO_AGENT` is set.
+On a hosted testnet demo it runs in the gateway's process as a separate
+client: every two seconds it lists requests over HTTP and collects each one
+cleared for its passports through the public `GET /data/:id` route, answering
+the x402 challenge from its own Hedera account. Nothing in the gateway's
+decision path calls it or reads its key. A request it cannot collect because
+payments are paused is tried again on the next pass; one refused at the gate,
+or whose payment fails, is left alone, so a failure never turns into repeated
+charges.
+
 ## Persistence
 
 `GatewayStore` keeps everything in memory and, when `FAREGATE_STATE_FILE` is

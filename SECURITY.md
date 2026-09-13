@@ -121,9 +121,16 @@ provider that fails, fails; it never falls back to simulated data.
 - **No custody.** The gateway holds no user funds and never sends a
   transaction. The agent pays with its own wallet; the human signs messages,
   never transactions.
-- **No keys in the gateway.** The only private key anywhere in the system is
-  the demo agent's throwaway testnet key, read from `.env` by the agent
-  process. The gateway never sees it.
+- **Keys.** The policy engine, the payment gate and every human action work
+  without a private key. The system has two keys, both throwaway test keys:
+  the agent's Hedera testnet key and the ENS owner's Sepolia key. The ENS key
+  never leaves the operator's machine. The agent key lives with the agent: in
+  `npm run agent` locally, and on the hosted testnet demo in a demo agent that
+  runs beside the gateway (`FAREGATE_DEMO_AGENT`) so a visitor's approval
+  completes in one click. That demo agent pays like any agent, through the
+  public x402 route from its own account, only for the demo passports and
+  within their onchain daily limits, and it refuses to run on any network but
+  Hedera testnet.
 - **Persistence is a local snapshot file.** Fine for one gateway on one
   machine; not a shared or replicated store.
 - **Single tenant, open reads.** The gateway serves one owner. Its read API
@@ -136,6 +143,8 @@ provider that fails, fails; it never falls back to simulated data.
 - **Signatures prove who acted, not that they were entitled to.** Any wallet
   can create an agent or approve a request; there is no owner check tying an
   agent to the wallet that created it. Adding one is a policy field away.
+  With the hosted demo agent on, any visitor's approval makes it pay for that
+  request, in test USDC and within the passports' daily limits.
 - **Unsigned mode exists.** `FAREGATE_REQUIRE_SIGNED_ACTIONS=false` accepts
   unsigned actions and records them as unsigned. It is for local experiments.
 - **Free hosting forgets.** On a free Render instance the snapshot file is

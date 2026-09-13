@@ -12,9 +12,10 @@ Everything stays on test networks: Hedera testnet USDC for fares, Sepolia for
 ENS. No real money moves anywhere, and neither host is given a key that could
 move any.
 
-The gateway gets two spend-limited API keys (The Graph, OpenRouter) and the
-public id of the Hedera account that receives fares. The agent's Hedera key,
-the gateway account's key and the ENS owner key never leave your machine.
+The gateway gets two spend-limited API keys (The Graph, OpenRouter), the
+public id of the Hedera account that receives fares, and, for one-click
+approvals, the agent's throwaway Hedera testnet key (step 4). The ENS owner
+key and the gateway account's key never leave your machine.
 
 ## What free means here
 
@@ -109,7 +110,29 @@ origins in `FAREGATE_CORS_ORIGIN`, and it still holds the placeholder.
 3. Reload the Vercel page. The header readout shows Pay, Data, AI and ENS in
    green with **Live**, and the rail lists the two ENS passports.
 
-## 4. The agent, from your machine
+## 4. One-click approvals on the live site
+
+With the demo agent on, approving a request on the dashboard is the only step:
+an agent running beside the gateway pays the fare from its own testnet account
+and collects the data within a few seconds.
+
+1. In Render, open the service → **Environment**, and add two variables with
+   the values from your local `.env`: `HEDERA_ACCOUNT_ID` and
+   `HEDERA_PRIVATE_KEY`. `render.yaml` already sets `FAREGATE_DEMO_AGENT=true`.
+2. Save. After the redeploy, the log shows
+   `[faregate] agent    demo agent 0.0.… collects cleared requests for …`, and
+   the dashboard's Gateway panel lists an Agent row.
+3. Send a test request from the dashboard and approve it. Within a few seconds
+   the row turns Delivered, with a HashScan link.
+
+This puts a throwaway testnet key on the host, on purpose. It holds test USDC
+only, the demo agent refuses any network but Hedera testnet, and the passports'
+onchain daily limits cap what it can spend at $1.05 a day. Set
+`FAREGATE_DEMO_AGENT=false` to turn it off. Leave it off while running
+`npm run e2e:live` against the hosted gateway, or the demo agent collects the
+test's requests before the test's own agent can.
+
+## 5. The agent, from your machine
 
 In `.env`:
 
@@ -130,8 +153,8 @@ local work.
   acted, not that they were entitled to; the gateway is single-tenant and its
   read API is open, as `SECURITY.md` states. Whoever approves, only your
   agent can pay, and it pays testnet USDC.
-- Not collect data: that needs the agent and its Hedera key, which stay with
-  you.
+- See an approved request paid and delivered, when the demo agent is on (step
+  4): it pays in test USDC from the agent's own account.
 - Not revoke: with ENS live, revocation is an onchain change by the owner
   key, also on your machine.
 

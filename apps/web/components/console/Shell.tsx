@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, TriangleAlert } from 'lucide-react';
+import { Check, Menu, TriangleAlert, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -28,11 +28,36 @@ const SUBSYSTEMS = [
 export function Shell({ children }: { children: ReactNode }) {
   const { requests, health, error, wallet, gatewayState } = useConsole();
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
   const waiting = requests.filter((r) => r.status === 'awaiting_approval').length;
   // The front page draws its own full-width bands; console pages sit in one column.
   const home = pathname === '/';
   const hasNotice =
     gatewayState === 'waking' || Boolean(error) || Boolean(wallet.error) || Boolean(health && health.notes.length > 0);
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+
+  // On a phone the pages live behind a menu button. Opening a page closes it, and so does Escape.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
+  const waitingBadge =
+    waiting > 0 ? (
+      <span
+        className="tnum rounded-[2px] bg-hold px-1 font-mono text-[11px] leading-[16px] text-white"
+        title={`${waiting} waiting for your signature`}
+      >
+        {waiting}
+      </span>
+    ) : null;
 
   const notices = (
     <>
@@ -68,44 +93,82 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-rule bg-sheet">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-8 gap-y-2 px-6 py-2 md:h-14 md:flex-nowrap md:py-0">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="Faregate home">
+        <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-2 px-4 sm:px-6 md:gap-8">
+          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Faregate home">
             <LogoMark />
             <span className="font-display text-[21px] font-semibold leading-none text-ink">Faregate</span>
           </Link>
 
-          <nav aria-label="Console" className="flex flex-wrap items-stretch gap-x-6 self-stretch">
+          <nav aria-label="Console" className="hidden items-stretch gap-x-6 self-stretch md:flex">
             {NAV.map((item) => {
-              const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`relative flex items-center gap-1.5 py-2 text-[14px] transition-colors md:py-0 ${
+                  className={`relative flex items-center gap-1.5 text-[14px] transition-colors ${
                     active ? 'font-medium text-ink' : 'text-ink-2 hover:text-ink'
                   }`}
                 >
                   {item.label}
-                  {item.href === '/requests' && waiting > 0 ? (
-                    <span
-                      className="tnum rounded-[2px] bg-hold px-1 font-mono text-[11px] leading-[16px] text-white"
-                      title={`${waiting} waiting for your signature`}
-                    >
-                      {waiting}
-                    </span>
-                  ) : null}
+                  {item.href === '/requests' ? waitingBadge : null}
                   {active ? <span className="absolute inset-x-0 bottom-0 h-[2px] bg-ink" aria-hidden /> : null}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="ml-auto flex items-center gap-5">
-            <SystemReadout />
+          <div className="ml-auto flex items-center gap-2 md:gap-5">
+            <div className="hidden md:block">
+              <SystemReadout />
+            </div>
             <WalletControl />
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-controls="phone-menu"
+              aria-label={
+                menuOpen ? 'Close menu' : waiting > 0 ? `Open menu, ${waiting} waiting for your signature` : 'Open menu'
+              }
+              className="relative -mr-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] text-ink transition-colors hover:bg-sheet-2 md:hidden"
+            >
+              {menuOpen ? <X className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
+              {!menuOpen && waiting > 0 ? (
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-hold" aria-hidden />
+              ) : null}
+            </button>
           </div>
         </div>
+
+        {menuOpen ? (
+          <nav id="phone-menu" aria-label="Console" className="border-t border-rule md:hidden">
+            <ul className="flex flex-col px-4 py-1.5">
+              {NAV.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? 'page' : undefined}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex h-12 items-center justify-between border-l-2 pl-3 pr-1 text-[16px] transition-colors ${
+                        active ? 'border-ink font-medium text-ink' : 'border-transparent text-ink-2 hover:text-ink'
+                      }`}
+                    >
+                      {item.label}
+                      {item.href === '/requests' ? waitingBadge : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="border-t border-rule px-4 py-3">
+              <SystemReadout wide />
+            </div>
+          </nav>
+        ) : null}
       </header>
 
       {home ? (
@@ -167,7 +230,8 @@ function GatewayUnreachable() {
   );
 }
 
-function SystemReadout() {
+/** The gateway's state. In the header it shows its full readout only on wide screens; in the phone menu, always. */
+function SystemReadout({ wide = false }: { wide?: boolean }) {
   const { health, loaded, gatewayState } = useConsole();
   if (gatewayState === 'waking') {
     return (
@@ -188,7 +252,7 @@ function SystemReadout() {
   }
   const simulated = SUBSYSTEMS.filter(({ key }) => health.modes[key] !== 'live');
   return (
-    <div className="hidden items-center gap-3 lg:flex" aria-label="Gateway subsystems">
+    <div className={`${wide ? 'flex flex-wrap' : 'hidden lg:flex'} items-center gap-3`} aria-label="Gateway subsystems">
       {SUBSYSTEMS.map(({ key, label }) => {
         const live = health.modes[key] === 'live';
         return (
@@ -229,7 +293,7 @@ function WalletControl() {
   }
 
   return (
-    <div className="flex items-center gap-3 border-l border-rule pl-5">
+    <div className="flex items-center gap-3 md:border-l md:border-rule md:pl-5">
       <div className="text-right leading-tight">
         <div className="font-mono text-[12.5px] text-ink">{shortAddress(wallet.address)}</div>
         <div className="text-[11.5px] text-muted">{wallet.name ?? 'Wallet'} · connected</div>
@@ -245,7 +309,7 @@ function Toast() {
     <div
       key={flash.id}
       role="status"
-      className={`toast fixed bottom-5 right-5 z-50 flex max-w-[420px] items-start gap-2.5 border border-rule border-l-[3px] bg-sheet py-2.5 pl-3 pr-4 text-[13.5px] leading-relaxed text-ink shadow-[0_6px_24px_rgba(28,27,24,0.12)] ${
+      className={`toast fixed bottom-5 left-5 right-5 z-50 flex items-start gap-2.5 border border-rule border-l-[3px] bg-sheet py-2.5 pl-3 pr-4 text-[13.5px] leading-relaxed text-ink shadow-[0_6px_24px_rgba(28,27,24,0.12)] sm:left-auto sm:max-w-[420px] ${
         flash.tone === 'ok' ? 'border-l-pass' : 'border-l-stop'
       }`}
     >

@@ -12,13 +12,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { GATEWAY_IS_LOCAL, GatewayError, api, type AgentWithPolicy, type Health, type Signer } from '@/lib/api';
 import {
   EMPTY_WALLET,
-  EXPECTED_CHAIN,
   SignatureDeclined,
   connectWallet,
   onWalletChange,
   readWallet,
   signActionMessage,
-  switchToExpectedChain,
   type WalletState,
 } from '@/lib/wallet';
 
@@ -59,8 +57,10 @@ export interface ConsoleState {
   refresh: () => Promise<void>;
   wallet: WalletState;
   connect: () => Promise<void>;
-  switchChain: () => Promise<void>;
-  /** A wallet is connected on the expected chain, so signed actions are possible. */
+  /**
+   * A wallet is connected, so signed actions are possible. Signing a message
+   * does not depend on the wallet's network, so no network is required.
+   */
   canAct: boolean;
   busy: string | null;
   setBusy: (key: string | null) => void;
@@ -89,7 +89,11 @@ export function explainFailure(err: unknown): string {
       case 'bad_signature':
         return 'The wallet signature did not match. Make sure the connected account is the one you meant to act with.';
       case 'signature_expired':
-        return 'That signature took too long to reach the gateway. Try again.';
+        return 'That signature is older than the gateway accepts. Sign again, and if it happens twice, check that this computer’s clock is right.';
+      case 'signature_replayed':
+        return 'That signature was already used. Try again to sign a fresh one.';
+      case 'not_awaiting_approval':
+        return 'Someone already decided this request. The list shows what happened.';
       default:
         return err.message;
     }
@@ -157,7 +161,6 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const connect = useCallback(async () => setWallet(await connectWallet()), []);
-  const switchChain = useCallback(async () => setWallet(await switchToExpectedChain()), []);
 
   const [flash, setFlash] = useState<Flash | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -169,7 +172,7 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const [busy, setBusy] = useState<string | null>(null);
-  const canAct = wallet.address !== null && wallet.chainId === EXPECTED_CHAIN.id;
+  const canAct = wallet.address !== null;
 
   // Every human action goes through here: the wallet shows the exact message
   // and signs it, and the gateway verifies the signature before acting.
@@ -197,6 +200,8 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
         await refresh();
       } catch (err) {
         notify(explainFailure(err), 'bad');
+        // A refusal can mean the request changed underneath, so show its current state.
+        await refresh();
       } finally {
         setBusy(null);
       }
@@ -219,7 +224,6 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
       refresh,
       wallet,
       connect,
-      switchChain,
       canAct,
       busy,
       setBusy,
@@ -228,7 +232,7 @@ export function ConsoleProvider({ children }: { children: ReactNode }) {
       notify,
       agentLabel,
     }),
-    [loaded, health, agents, requests, events, error, gatewayState, refresh, wallet, connect, switchChain, canAct, busy, run, flash, notify, agentLabel],
+    [loaded, health, agents, requests, events, error, gatewayState, refresh, wallet, connect, canAct, busy, run, flash, notify, agentLabel],
   );
 
   return <ConsoleContext.Provider value={value}>{children}</ConsoleContext.Provider>;

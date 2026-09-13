@@ -34,7 +34,7 @@ export default function PassportsPage() {
             <Button variant="primary" onClick={() => setCreating((v) => !v)} disabled={!canAct && !creating}>
               {creating ? 'Close' : 'New passport'}
             </Button>
-            {!canAct ? <span className="text-[12px] text-muted">Connect a wallet on Sepolia to create one.</span> : null}
+            {!canAct ? <span className="text-[12px] text-muted">Connect a wallet to create one.</span> : null}
           </div>
         )}
       </PageHeader>
@@ -192,7 +192,7 @@ function PassportRow({ agent }: { agent: AgentWithPolicy }) {
                   Revoke
                 </Button>
               )}
-              {!canAct ? <p className="text-[11.5px] text-muted">Connect a wallet on Sepolia to change this passport.</p> : null}
+              {!canAct ? <p className="text-[11.5px] text-muted">Connect a wallet to change this passport.</p> : null}
             </>
           )}
         </div>

@@ -17,10 +17,6 @@
  */
 
 import { createWalletClient, custom, type Address, type EIP1193Provider, type Hex } from 'viem';
-import { sepolia } from 'viem/chains';
-
-export const EXPECTED_CHAIN = sepolia;
-
 export interface WalletState {
   address: Address | null;
   chainId: number | null;
@@ -179,21 +175,6 @@ export async function connectWallet(): Promise<WalletState> {
       error: describeWalletError(error, wallet.name),
     };
   }
-}
-
-/** Asks the wallet to switch to the expected chain. Never throws. */
-export async function switchToExpectedChain(): Promise<WalletState> {
-  const wallet = await chooseWallet();
-  if (!wallet) return EMPTY_WALLET;
-  try {
-    await createWalletClient({ chain: EXPECTED_CHAIN, transport: custom(wallet.provider, { retryCount: 0 }) }).switchChain({
-      id: EXPECTED_CHAIN.id,
-    });
-  } catch (error) {
-    const state = await readWallet();
-    return { ...state, error: describeWalletError(error, wallet.name) };
-  }
-  return readWallet();
 }
 
 /** Thrown when the human declines to sign in the wallet. Not an error to alarm about. */

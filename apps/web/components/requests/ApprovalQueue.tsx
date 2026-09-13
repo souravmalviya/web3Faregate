@@ -11,7 +11,7 @@ import { approvalReason, describeQuery } from './model';
  * why it needs a person on the left, the fare and the decision on the stub.
  */
 export function ApprovalQueue() {
-  const { requests, agents, canAct, busy, run, wallet, health, agentLabel } = useConsole();
+  const { requests, agents, canAct, busy, run, wallet, connect, health, agentLabel } = useConsole();
   const waiting = requests.filter((r) => r.status === 'awaiting_approval');
   if (waiting.length === 0) return null;
 
@@ -26,6 +26,13 @@ export function ApprovalQueue() {
         ? `Approved and signed. The demo agent is paying ${usd(updated.estimatedCostUsd)} and collecting the data now.`
         : `Approved and signed. The agent may now pay ${usd(updated.estimatedCostUsd)} and collect the data.`;
     });
+
+  const hint =
+    canAct && wallet.address
+      ? `Signs a message as ${shortAddress(wallet.address)}. No transaction is sent.`
+      : wallet.available
+        ? 'Your wallet signs a message to decide. No transaction is sent.'
+        : 'Deciding needs a browser wallet such as MetaMask. It only signs a message.';
 
   return (
     <section aria-labelledby="needs-signature" className="mb-10">
@@ -64,24 +71,32 @@ export function ApprovalQueue() {
                   <div className="mt-1 text-[12px] text-muted">USDC · {network}</div>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="approve"
-                    className="flex-1"
-                    loading={isBusy}
-                    disabled={!canAct}
-                    onClick={() => void decide(request.id, 'approved')}
-                  >
-                    {isBusy ? 'Signing' : 'Approve'}
-                  </Button>
-                  <Button variant="danger" disabled={!canAct || isBusy} onClick={() => void decide(request.id, 'rejected')}>
-                    Reject
-                  </Button>
+                  {canAct ? (
+                    <>
+                      <Button
+                        variant="approve"
+                        className="flex-1"
+                        loading={isBusy}
+                        onClick={() => void decide(request.id, 'approved')}
+                      >
+                        {isBusy ? 'Signing' : 'Approve'}
+                      </Button>
+                      <Button variant="danger" disabled={isBusy} onClick={() => void decide(request.id, 'rejected')}>
+                        Reject
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="approve"
+                      className="flex-1"
+                      disabled={!wallet.available}
+                      onClick={() => void connect()}
+                    >
+                      Connect to approve
+                    </Button>
+                  )}
                 </div>
-                <p className="text-[11.5px] leading-snug text-muted">
-                  {canAct && wallet.address
-                    ? `Signs a message as ${shortAddress(wallet.address)}. No transaction is sent.`
-                    : 'Connect a wallet on Sepolia to sign.'}
-                </p>
+                <p className="text-[11.5px] leading-snug text-muted">{hint}</p>
               </div>
             </li>
           );

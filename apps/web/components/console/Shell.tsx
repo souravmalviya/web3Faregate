@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { GATEWAY_IS_LOCAL, GATEWAY_URL, shortAddress } from '@/lib/api';
-import { EXPECTED_CHAIN } from '@/lib/wallet';
 
 import { Button, LogoMark, Notice } from '../ui';
 import { useConsole } from './ConsoleProvider';
@@ -206,31 +205,35 @@ function SystemReadout() {
   );
 }
 
+/**
+ * The wallet only ever signs messages, which works on any network, so a
+ * connected wallet is ready to act whichever network it is on.
+ */
 function WalletControl() {
-  const { wallet, connect, switchChain } = useConsole();
+  const { wallet, connect, notify } = useConsole();
 
   if (!wallet.address) {
     return (
-      <Button size="sm" variant="secondary" onClick={() => void connect()} disabled={!wallet.available}>
-        {wallet.available ? 'Connect wallet' : 'No wallet detected'}
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() =>
+          wallet.available
+            ? void connect()
+            : notify('Approving needs a browser wallet such as MetaMask. Everything else on this site works without one.', 'bad')
+        }
+      >
+        {wallet.available ? 'Connect wallet' : 'No wallet found'}
       </Button>
     );
   }
 
-  const wrongChain = wallet.chainId !== EXPECTED_CHAIN.id;
   return (
     <div className="flex items-center gap-3 border-l border-rule pl-5">
       <div className="text-right leading-tight">
         <div className="font-mono text-[12.5px] text-ink">{shortAddress(wallet.address)}</div>
-        <div className={`text-[11.5px] ${wrongChain ? 'text-stop' : 'text-muted'}`}>
-          {wallet.name ?? 'Wallet'} · {wrongChain ? 'wrong network' : EXPECTED_CHAIN.name}
-        </div>
+        <div className="text-[11.5px] text-muted">{wallet.name ?? 'Wallet'} · connected</div>
       </div>
-      {wrongChain ? (
-        <Button size="sm" variant="danger" onClick={() => void switchChain()}>
-          Switch to {EXPECTED_CHAIN.name}
-        </Button>
-      ) : null}
     </div>
   );
 }

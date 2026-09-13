@@ -1,0 +1,30 @@
+# Typecheck, tests, lint and production builds on every push to main and on
+# every pull request. Runs on GitHub's free minutes for public repositories.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      # The gateway and the dashboard import the shared package from its build output.
+      - run: npm run build --workspace @faregate/shared
+      - run: npm run check

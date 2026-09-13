@@ -53,6 +53,12 @@ services:
         value: "200"
       # Entered in the Render dashboard. The dashboard's public URL, the
       # gateway's Hedera testnet account, and two spend-limited API keys.
+      #
+      # FAREGATE_CORS_ORIGIN is the dashboard's production address, scheme and
+      # host only, for example https://web3-faregate.vercel.app. Until it is
+      # set, the hosted dashboard reports the gateway as unreachable. Separate
+      # several with commas; * stands for one part of a host name, for example
+      # https://web3-faregate-*-your-team.vercel.app for every deployment URL.
       - key: FAREGATE_CORS_ORIGIN
         sync: false
       - key: FAREGATE_PAY_TO

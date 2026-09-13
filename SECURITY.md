@@ -121,7 +121,9 @@ provider that fails, fails; it never falls back to simulated data.
   (`GET /requests`, `GET /events`, `GET /agents`) is the owner's dashboard
   view and is not authenticated, so anyone who can reach the gateway can read
   the queue, including data agents have collected. Run it for one owner, or
-  put it behind an authenticating proxy.
+  put it behind an authenticating proxy. `FAREGATE_CORS_ORIGIN` only decides
+  which websites' scripts may read the gateway from a visitor's browser; it
+  is not authentication, and the gateway sets no cookies.
 - **Signatures prove who acted, not that they were entitled to.** Any wallet
   can create an agent or approve a request; there is no owner check tying an
   agent to the wallet that created it. Adding one is a policy field away.

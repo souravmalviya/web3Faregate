@@ -49,7 +49,7 @@ the gateway account's key and the ENS owner key never leave your machine.
 
    | Variable | Value |
    |---|---|
-   | `FAREGATE_CORS_ORIGIN` | A placeholder for now, `https://example.invalid`. Step 3 sets the real one. |
+   | `FAREGATE_CORS_ORIGIN` | A placeholder for now, `https://example.invalid`. Step 3 sets the real one; until then the hosted dashboard cannot reach the gateway. |
    | `FAREGATE_PAY_TO` | `0.0.10457565`, the gateway's Hedera testnet account |
    | `GRAPH_API_KEY` | from `.env` |
    | `GRAPH_SUBGRAPHS` | from `.env`, the whole `aave-v3=...,compound-v3=...,spark-lend=...` line |
@@ -77,16 +77,26 @@ latest commit** to try again.
 3. **Environment Variables**: add `NEXT_PUBLIC_FAREGATE_GATEWAY_URL` with the
    Render URL from step 1, no trailing slash.
 4. **Deploy**. About two minutes.
-5. Copy the dashboard URL, `https://web3-faregate-xxxx.vercel.app`.
+5. Open the project's **Settings** → **Domains** and copy the production
+   domain, for example `https://web3-faregate.vercel.app`. Use that one, not
+   the long address of a single deployment, which changes on every push.
 
 ## 3. Connect the two
 
-1. In Render, open the service → **Environment** → set
-   `FAREGATE_CORS_ORIGIN` to the Vercel URL, exactly as shown, no trailing
-   slash. To keep the local dashboard working too, give both,
-   comma-separated: `https://web3-faregate-xxxx.vercel.app,http://localhost:3000`.
-2. **Save changes**. Render redeploys, about two minutes.
-3. Open the Vercel URL. The header readout shows Pay, Data, AI and ENS in
+Until this step the hosted dashboard says it can't reach the gateway, even
+though `/health` opens in a tab: the gateway only answers browser pages on the
+origins in `FAREGATE_CORS_ORIGIN`, and it still holds the placeholder.
+
+1. In Render, open the service → **Environment** → edit
+   `FAREGATE_CORS_ORIGIN`. Put the production domain, `https://` included,
+   and keep localhost if you also run the dashboard locally:
+   `https://web3-faregate.vercel.app,http://localhost:3000`. A trailing slash
+   is fine. To also allow Vercel's per-deployment addresses, add a pattern in
+   which `*` stands for one part of the name:
+   `https://web3-faregate-*-your-team.vercel.app`.
+2. Save. Render redeploys in about two minutes, and its log now has a line
+   `[faregate] cors     browser origins ...` listing what is allowed.
+3. Reload the Vercel page. The header readout shows Pay, Data, AI and ENS in
    green with **Live**, and the rail lists the two ENS passports.
 
 ## 4. The agent, from your machine
@@ -124,6 +134,19 @@ curl https://faregate-gateway-xxxx.onrender.com/health
 `modes` all `live`, `notes` empty, `signedActions` true. Then load the
 dashboard, connect MetaMask on Sepolia, send a test request from the panel,
 approve it, and run the agent from your machine to collect it.
+
+## If the dashboard can't reach the gateway
+
+Open `https://<service>.onrender.com/health` in a new tab.
+
+- **It takes up to a minute, then answers.** The free instance was asleep.
+  The dashboard catches up on its own within two seconds.
+- **It answers at once, but the dashboard still can't reach it.** The gateway
+  is refusing the dashboard's origin. The red notice names the exact address;
+  add it to `FAREGATE_CORS_ORIGIN` in Render (step 3). The Render log's
+  `cors` line shows what is allowed now, and warns while the placeholder
+  `https://example.invalid` is still set.
+- **It never answers.** Check the Render log for a failed start.
 
 ## Updating
 

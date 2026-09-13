@@ -190,7 +190,7 @@ Turn subsystems live one at a time in `.env`:
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8402` | Gateway port |
-| `FAREGATE_CORS_ORIGIN` | `http://localhost:3000` | Dashboard origin, or several comma-separated |
+| `FAREGATE_CORS_ORIGIN` | `http://localhost:3000` | Dashboard origins, comma-separated; `*` stands for one part of a host name |
 | `FAREGATE_REQUIRE_SIGNED_ACTIONS` | `true` | Human actions must carry a verified wallet signature |
 | `FAREGATE_STATE_FILE` | `data/faregate-state.json` | Snapshot file; `off` for memory only |
 | `FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Submissions per agent per minute |

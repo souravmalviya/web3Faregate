@@ -75,7 +75,7 @@ export interface Verdict {
   detail: string;
 }
 
-export function verdictFor(r: AccessRequest): Verdict {
+export function verdictFor(r: AccessRequest, options: { autoCollect?: boolean } = {}): Verdict {
   const first = r.decision?.reasons[0];
   switch (r.status) {
     case 'awaiting_approval':
@@ -92,6 +92,14 @@ export function verdictFor(r: AccessRequest): Verdict {
           stamp: 'Refused',
           line: 'Stopped at the gate',
           detail: `Refused at the gate before payment: ${r.lastRefusal.reason}`,
+        };
+      }
+      if (options.autoCollect) {
+        return {
+          tone: 'brand',
+          stamp: 'Cleared',
+          line: r.approval ? 'Approved, the agent is paying' : 'The agent is paying',
+          detail: `${r.approval ? 'Approved.' : 'Within every limit, so no approval was needed.'} The demo agent is paying the fare from its own account and collecting the data. This takes a few seconds.`,
         };
       }
       return r.approval

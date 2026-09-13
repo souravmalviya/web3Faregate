@@ -20,9 +20,11 @@ export function ApprovalQueue() {
   const decide = (id: string, decision: 'approved' | 'rejected') =>
     run(id, async (sign) => {
       const updated = await api.approve(id, decision, sign);
-      return decision === 'approved'
-        ? `Approved and signed. The agent may now pay ${usd(updated.estimatedCostUsd)} and collect the data.`
-        : 'Rejected and signed. The agent pays nothing.';
+      const agentPaysNow = Boolean(health?.demoAgent?.passports.includes(updated.agentId.toLowerCase()));
+      if (decision === 'rejected') return 'Rejected and signed. The agent pays nothing.';
+      return agentPaysNow
+        ? `Approved and signed. The demo agent is paying ${usd(updated.estimatedCostUsd)} and collecting the data now.`
+        : `Approved and signed. The agent may now pay ${usd(updated.estimatedCostUsd)} and collect the data.`;
     });
 
   return (

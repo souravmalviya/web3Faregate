@@ -99,6 +99,18 @@ export function RequestLedger() {
   );
 }
 
+/**
+ * The account the gateway's demo agent pays from when it collects this
+ * passport's cleared requests by itself: an empty string when payments are
+ * simulated, and null when no demo agent collects for this passport.
+ */
+function useDemoAgentPayer(agentId: string): string | null {
+  const { health } = useConsole();
+  const agent = health?.demoAgent;
+  if (!agent || !agent.passports.includes(agentId.toLowerCase())) return null;
+  return agent.account ?? '';
+}
+
 function LedgerRow({
   request,
   agentLabel,
@@ -112,7 +124,7 @@ function LedgerRow({
   open: boolean;
   onToggle: () => void;
 }) {
-  const verdict = verdictFor(request);
+  const verdict = verdictFor(request, { autoCollect: useDemoAgentPayer(request.agentId) !== null });
   const days = request.query.lookbackDays;
   const arrived = Date.now() - Date.parse(request.createdAt) < 6000;
 
@@ -184,7 +196,7 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function RequestDetail({ request, network }: { request: AccessRequest; network: string }) {
-  const verdict = verdictFor(request);
+  const verdict = verdictFor(request, { autoCollect: useDemoAgentPayer(request.agentId) !== null });
   return (
     <div className="border-t border-rule">
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 px-5 pt-4">
@@ -359,6 +371,15 @@ function PaymentBody({ request, network }: { request: AccessRequest; network: st
  * behind it, so the row gives the command that collects it.
  */
 function CollectHint({ request }: { request: AccessRequest }) {
+  const payer = useDemoAgentPayer(request.agentId);
+  if (payer !== null && request.status === 'payment_required') {
+    return (
+      <p className="text-[13px] leading-relaxed text-ink-2">
+        The demo agent on this gateway is paying the fare from its own account{payer ? ` ${payer}` : ''} and
+        collecting the data. There is nothing for you to do; this row updates within a few seconds.
+      </p>
+    );
+  }
   const command = [
     'npm run agent --',
     ...(GATEWAY_IS_LOCAL ? [] : ['--gateway', GATEWAY_URL]),

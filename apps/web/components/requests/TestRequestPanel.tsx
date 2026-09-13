@@ -17,13 +17,15 @@ const EXAMPLES = [
 
 /** Sends the same request an agent would. It never pays: collecting data is the agent's job. */
 export function TestRequestPanel() {
-  const { agents, busy, setBusy, refresh } = useConsole();
+  const { agents, busy, setBusy, refresh, health } = useConsole();
   const [agentId, setAgentId] = useState('');
   const [prompt, setPrompt] = useState(EXAMPLES[0]?.prompt ?? '');
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<string | null>(null);
   const selected = agentId || agents[0]?.id || '';
   const sending = busy === 'submit';
+  // On a hosted demo, an agent beside the gateway pays for this passport's cleared requests by itself.
+  const agentPays = Boolean(health?.demoAgent?.passports.includes(selected.toLowerCase()));
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -38,9 +40,13 @@ export function TestRequestPanel() {
       const r = out.request;
       setOutcome(
         r.status === 'awaiting_approval'
-          ? `Waiting for your signature: ${usd(r.estimatedCostUsd)}. It is at the top of the list. After you approve, open it for the command that collects and pays for it.`
+          ? agentPays
+            ? `Waiting for your signature: ${usd(r.estimatedCostUsd)}. Approve it at the top of the list, and the demo agent pays and collects the data within seconds.`
+            : `Waiting for your signature: ${usd(r.estimatedCostUsd)}. It is at the top of the list. After you approve, open it for the command that collects and pays for it.`
           : r.status === 'payment_required'
-            ? `Cleared by the passport at ${usd(r.estimatedCostUsd)}. Open it in the list for the command that collects and pays for it.`
+            ? agentPays
+              ? `Cleared by the passport at ${usd(r.estimatedCostUsd)}, no approval needed. The demo agent is paying and collecting the data now.`
+              : `Cleared by the passport at ${usd(r.estimatedCostUsd)}. Open it in the list for the command that collects and pays for it.`
             : `Refused: ${r.decision?.reasons[0]?.message ?? 'the passport check failed'}`,
       );
       await refresh();
@@ -106,8 +112,9 @@ export function TestRequestPanel() {
         </div>
         {outcome ? <p className="text-[12.5px] leading-relaxed text-ink">{outcome}</p> : null}
         <p className="text-[11.5px] leading-snug text-muted">
-          Sends the ask the way an agent would, but no agent is waiting on it. Nothing is paid until an agent collects
-          it with its own wallet; each request shows the command.
+          {agentPays
+            ? 'Sends the ask the way an agent would. On this gateway the demo agent pays for cleared requests from its own testnet account, so approving is the only step.'
+            : 'Sends the ask the way an agent would, but no agent is waiting on it. Nothing is paid until an agent collects it with its own wallet; each request shows the command.'}
         </p>
       </form>
     </section>

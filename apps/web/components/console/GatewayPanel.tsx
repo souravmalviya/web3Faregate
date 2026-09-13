@@ -13,6 +13,15 @@ export function GatewayPanel() {
     { name: 'Data', mode: health.modes.data, text: health.providers.data },
     { name: 'Model', mode: health.modes.ai, text: health.providers.ai },
     { name: 'Identity', mode: health.modes.ens, text: health.providers.identity },
+    ...(health.demoAgent
+      ? [
+          {
+            name: 'Agent',
+            mode: 'live',
+            text: `Demo agent${health.demoAgent.account ? ` ${health.demoAgent.account}` : ''} pays for cleared requests from its own account, so approving is the only step.${health.demoAgent.lastError ? ` Last problem: ${health.demoAgent.lastError}` : ''}`,
+          },
+        ]
+      : []),
   ];
 
   return (

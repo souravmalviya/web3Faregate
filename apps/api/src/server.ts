@@ -8,6 +8,7 @@ import {
   RuleBasedAIProvider,
   type AIProvider,
 } from './ai/provider.ts';
+import { DemoAgent } from './agent/demo-agent.ts';
 import { createApp } from './app.ts';
 import { BLOCKY402_MAINNET, BLOCKY402_TESTNET, describeModes, loadConfig } from './config.ts';
 import {
@@ -120,9 +121,14 @@ let paymentReady = paymentServer === undefined;
 const awakeTarget = config.keepAwakeUrl ?? null;
 let lastAwakeAnswer: string | null = null;
 
+// The hosted demo agent, when switched on: a separate client in this process
+// that pays for cleared requests from its own account (agent/demo-agent.ts).
+let demoAgent: DemoAgent | null = null;
+
 start();
 if (paymentServer) checkFacilitator(paymentServer);
 if (awakeTarget) keepAwake(awakeTarget);
+if (config.demoAgent?.enabled) demoAgent = startDemoAgent();
 
 function start(): void {
   const app = createApp({
@@ -133,6 +139,7 @@ function start(): void {
     identity,
     ...(paymentServer ? { paymentServer, paymentReady: () => paymentReady } : {}),
     ...(awakeTarget ? { keepAwake: () => ({ target: awakeTarget, lastAnsweredAt: lastAwakeAnswer }) } : {}),
+    ...(config.demoAgent?.requested ? { demoAgent: () => demoAgent?.status() ?? null } : {}),
   });
 
   const server = app.listen(config.port, () => {
@@ -183,6 +190,14 @@ function start(): void {
         `[faregate] awake    visiting ${awakeTarget} every ${KEEP_AWAKE_EVERY_MS / 60_000} minutes so the host does not put the gateway to sleep`,
       );
     }
+    if (config.demoAgent?.enabled) {
+      const payer = config.payment.mode === 'live' ? ` ${config.demoAgent.accountId}` : '';
+      console.log(
+        `[faregate] agent    demo agent${payer} collects cleared requests for ${config.demoAgent.passports.join(', ')} and pays from its own account`,
+      );
+    } else if (config.demoAgent?.requested) {
+      console.warn(`[faregate] agent    demo agent is off: ${config.demoAgent.reason}`);
+    }
     for (const note of notes) console.log(`[faregate] note: ${note}`);
   });
 
@@ -228,6 +243,40 @@ function checkFacilitator(server: x402HTTPResourceServer): void {
       setTimeout(() => checkFacilitator(server), FACILITATOR_RETRY_MS).unref();
     },
   );
+}
+
+/**
+ * Starts the demo agent. It talks to this gateway over HTTP like any agent, and
+ * pays from its own account. Its key is read here, from the environment, and
+ * never logged.
+ */
+function startDemoAgent(): DemoAgent | null {
+  const settings = config.demoAgent;
+  if (!settings?.enabled) return null;
+  const live = config.payment.mode === 'live';
+  try {
+    const agent = new DemoAgent({
+      gatewayUrl: `http://127.0.0.1:${config.port}`,
+      passports: settings.passports,
+      ...(live && settings.accountId
+        ? {
+            payer: {
+              accountId: settings.accountId,
+              privateKey: process.env.HEDERA_PRIVATE_KEY?.trim() ?? '',
+              network: config.payment.network,
+            },
+          }
+        : {}),
+    });
+    agent.start();
+    return agent;
+  } catch {
+    // The underlying error could quote the key it failed to parse, so it is not printed.
+    console.error(
+      '[faregate] agent    the demo agent could not start: HEDERA_PRIVATE_KEY could not be read. Cleared requests wait for an agent.',
+    );
+    return null;
+  }
 }
 
 /** Visits `target` a minute after start and every ten minutes after that. A failed visit is logged once, not fatal. */

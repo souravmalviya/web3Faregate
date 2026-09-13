@@ -156,6 +156,8 @@ export interface AppConfig {
   stateFile: string | null;
   /** An address the gateway visits every ten minutes to stay awake, or null. See `keepAwakeTarget`. */
   keepAwakeUrl?: string | null;
+  /** The demo agent that pays for cleared requests on a hosted demo. See `resolveDemoAgent`. */
+  demoAgent?: DemoAgentConfig;
   rateLimit: RateLimitConfig;
   payment: PaymentConfig;
   data: DataConfig;
@@ -343,8 +345,67 @@ export function corsAllowList(origins: readonly string[]): Array<string | RegExp
   });
 }
 
+export interface DemoAgentConfig {
+  /** True when the demo agent will run. */
+  enabled: boolean;
+  /** True when FAREGATE_DEMO_AGENT asked for it, whether or not it can run. */
+  requested: boolean;
+  /** Passports it collects for, lowercase. */
+  passports: string[];
+  /** The Hedera account it pays from. Its key is never part of the config. */
+  accountId: string | undefined;
+  /** Why it is not running, when it was asked for. */
+  reason?: string;
+}
+
+export interface DemoAgentInput {
+  requested: boolean;
+  paymentMode: SubsystemMode;
+  network: string;
+  accountId: string | undefined;
+  hasKey: boolean;
+  passports: string | undefined;
+  parentName: string;
+}
+
+/**
+ * Whether the demo agent runs, and for which passports.
+ *
+ * The demo agent lets a hosted gateway complete a visitor's approval in one
+ * click (see agent/demo-agent.ts). It is off unless FAREGATE_DEMO_AGENT asks
+ * for it. With live payments it needs the agent's account and key, and it
+ * refuses any network but Hedera testnet, so it can never spend real money.
+ * By default it collects for the two demo passports under the parent name.
+ */
+export function resolveDemoAgent(input: DemoAgentInput): DemoAgentConfig {
+  const passports = (input.passports ?? `research.${input.parentName},trial.${input.parentName}`)
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean);
+  const base = { requested: input.requested, passports, accountId: input.accountId };
+  if (!input.requested) return { ...base, enabled: false };
+  if (input.paymentMode === 'live') {
+    if (input.network !== HEDERA_TESTNET) {
+      return {
+        ...base,
+        enabled: false,
+        reason: `the demo agent only pays on ${HEDERA_TESTNET}, and this gateway settles on ${input.network}`,
+      };
+    }
+    if (!input.accountId || !input.hasKey) {
+      return { ...base, enabled: false, reason: 'HEDERA_ACCOUNT_ID and HEDERA_PRIVATE_KEY are needed for the demo agent to pay' };
+    }
+  }
+  if (passports.length === 0) {
+    return { ...base, enabled: false, reason: 'FAREGATE_DEMO_AGENT_PASSPORTS lists no passports' };
+  }
+  return { ...base, enabled: true };
+}
+
 export function loadConfig(): AppConfig {
   const cors = parseCorsOrigins(str('FAREGATE_CORS_ORIGIN'));
+  const payment = loadPayment();
+  const ens = loadEns();
   return {
     port: int('PORT', 8402),
     corsOrigins: cors.origins,
@@ -357,10 +418,19 @@ export function loadConfig(): AppConfig {
       requestsPerMinute: Math.max(1, int('FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE', 60)),
       actionsPerMinute: Math.max(1, int('FAREGATE_RATE_LIMIT_ACTIONS_PER_MINUTE', 30)),
     },
-    payment: loadPayment(),
+    payment,
     data: loadData(),
     ai: loadAi(),
-    ens: loadEns(),
+    ens,
+    demoAgent: resolveDemoAgent({
+      requested: bool('FAREGATE_DEMO_AGENT', false),
+      paymentMode: payment.mode,
+      network: payment.network,
+      accountId: str('HEDERA_ACCOUNT_ID'),
+      hasKey: Boolean(str('HEDERA_PRIVATE_KEY')),
+      passports: str('FAREGATE_DEMO_AGENT_PASSPORTS'),
+      parentName: ens.parentName,
+    }),
   };
 }
 

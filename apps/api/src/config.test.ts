@@ -9,7 +9,37 @@ import {
   keepAwakeTarget,
   parseCorsOrigins,
   parseRpcUrls,
+  resolveDemoAgent,
 } from './config.ts';
+
+test('the demo agent runs only when asked, pays only on Hedera testnet, and needs its key to pay', () => {
+  const base = {
+    requested: true,
+    paymentMode: 'live' as const,
+    network: 'hedera:testnet',
+    accountId: '0.0.10455772',
+    hasKey: true,
+    passports: undefined,
+    parentName: 'agents.faregate.eth',
+  };
+  assert.equal(resolveDemoAgent(base).enabled, true);
+  assert.deepEqual(resolveDemoAgent(base).passports, ['research.agents.faregate.eth', 'trial.agents.faregate.eth']);
+  assert.equal(resolveDemoAgent({ ...base, requested: false }).enabled, false);
+
+  const mainnet = resolveDemoAgent({ ...base, network: 'hedera:mainnet' });
+  assert.equal(mainnet.enabled, false);
+  assert.match(mainnet.reason ?? '', /only pays on hedera:testnet/);
+
+  const keyless = resolveDemoAgent({ ...base, hasKey: false });
+  assert.equal(keyless.enabled, false);
+  assert.match(keyless.reason ?? '', /HEDERA_PRIVATE_KEY/);
+
+  // With simulated payments nothing is charged, so no key is needed.
+  assert.equal(resolveDemoAgent({ ...base, paymentMode: 'simulated', hasKey: false, accountId: undefined }).enabled, true);
+  assert.deepEqual(resolveDemoAgent({ ...base, passports: ' Trial.agents.faregate.eth , ' }).passports, [
+    'trial.agents.faregate.eth',
+  ]);
+});
 
 test('a hosted gateway visits its own public health check to stay awake, unless told otherwise', () => {
   const render = 'https://faregate-gateway.onrender.com';

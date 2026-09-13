@@ -36,6 +36,7 @@ import {
 import type { x402HTTPResourceServer } from '@x402/core/server';
 import { paymentMiddlewareFromHTTPServer } from '@x402/express';
 
+import type { DemoAgentStatus } from './agent/demo-agent.ts';
 import type { AIProvider } from './ai/provider.ts';
 import { corsAllowList, describeModes, type AppConfig } from './config.ts';
 import type { DataProvider } from './data/provider.ts';
@@ -68,6 +69,8 @@ export interface AppDeps {
   paymentReady?: () => boolean;
   /** The entrypoint's keep-awake visits, reported on /health so they can be checked from outside. */
   keepAwake?: () => KeepAwakeStatus;
+  /** The demo agent's status when it was asked for; null when it is not running. */
+  demoAgent?: () => DemoAgentStatus | null;
   /** Injected so tests can pin time. */
   now?: () => Date;
 }
@@ -228,6 +231,8 @@ export function createApp(deps: AppDeps): Express {
 
   app.get('/health', (_req: Request, res: Response) => {
     const paymentWaiting = config.payment.mode === 'live' && !paymentReady();
+    const demoAgent = deps.demoAgent?.() ?? null;
+    const demoAgentOff = config.demoAgent?.requested === true && demoAgent === null;
     res.json({
       ok: true,
       service: 'faregate-gateway',
@@ -235,10 +240,14 @@ export function createApp(deps: AppDeps): Express {
       modes: describeModes(config),
       paymentReady: !paymentWaiting,
       keepAwake: deps.keepAwake?.() ?? null,
+      demoAgent,
       notes: [
         config.payment.reason,
         paymentWaiting
           ? 'The payment facilitator has not confirmed it can settle yet, so paid collection is paused. The gateway retries every 30 seconds.'
+          : undefined,
+        demoAgentOff
+          ? `The demo agent is switched on but not running${config.demoAgent?.reason ? ` (${config.demoAgent.reason})` : ''}, so cleared requests wait for an agent.`
           : undefined,
         config.data.reason,
         config.ai.reason,

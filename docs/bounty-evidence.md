@@ -70,6 +70,15 @@ The same run showed that a fulfilled request cannot be collected or paid for
 twice, and that an agent revoked onchain is refused at the gate while holding
 a payable quote, without paying.
 
+**Again on the hosted deployment, 2026-09-13.** The same 26 checks passed
+against the public gateway at https://faregate-gateway.onrender.com, which the
+dashboard at https://web3-faregate-web.vercel.app talks to.
+
+| Payment | Why it was allowed | HashScan |
+|---|---|---|
+| $0.036, 30 days of wallet activity | Above the $0.02 line, so approved by a wallet-signed human first | [0.0.7162784@1789280841.504457079](https://hashscan.io/testnet/transaction/0.0.7162784%401789280841.504457079) |
+| $0.0102, today's balances | Inside every limit, so cleared by policy with no human | [0.0.7162784@1789280858.204136805](https://hashscan.io/testnet/transaction/0.0.7162784%401789280858.204136805) |
+
 ---
 
 ## The Graph: Best AI Use Case (Start Fresh)
@@ -165,6 +174,7 @@ passports through `UniversalResolverV2`.
 | `research.agents.faregate.eth` records | [transaction](https://sepolia.etherscan.io/tx/0x1bb5f46d0fbeec04e896318a365b58719e224a45d837df2153abc4fd610e055a) |
 | `trial.agents.faregate.eth` records | [transaction](https://sepolia.etherscan.io/tx/0x1349b377989c4d8ab0579c9b4a5b12aecbff00a5b1e2046a95fc07ba8bd0b10e) |
 | Onchain revocation of `trial` during the live test, refused at the gate on its next collection | [transaction](https://sepolia.etherscan.io/tx/0x0cf3658463af0c00140bfddfcf9fd35492a702334561deac18555e670f784a2e) |
+| The same revocation against the hosted gateway, 2026-09-13, refused there with a payable quote in hand | [transaction](https://sepolia.etherscan.io/tx/0xffaa246ce42147b33230cfb315da1fa9cee4c7f5ed6b7b5cdf0ac7854d38b25f) |
 
 ---
 

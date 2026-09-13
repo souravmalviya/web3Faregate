@@ -125,6 +125,8 @@ the Sepolia registrar in its free MockUSDC.
 - GitHub: https://github.com/souravmalviya/web3Faregate
 - Live dashboard (test networks only): https://web3-faregate-web.vercel.app
 - Live gateway: https://faregate-gateway.onrender.com/health
+- Hedera x402 payment through the hosted gateway, human-approved: https://hashscan.io/testnet/transaction/0.0.7162784%401789280841.504457079
+- Hedera x402 payment through the hosted gateway, cleared by policy alone: https://hashscan.io/testnet/transaction/0.0.7162784%401789280858.204136805
 - Demo video: `[add the link]`
 - ENS passport records on Sepolia: https://sepolia.etherscan.io/tx/0x1bb5f46d0fbeec04e896318a365b58719e224a45d837df2153abc4fd610e055a
 - ENS resolver on Sepolia: https://sepolia.etherscan.io/address/0xc305b40688D41bf05635Ab6cbc1ec0cb7FF18862

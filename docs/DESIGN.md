@@ -150,7 +150,8 @@ drawings, under two rules.
    shadows only on things drawn as lifted off the page.
 
 Copy uses Faregate's own terms (passport, approval line, fare, revoke) and the
-fewest words that carry the idea. Try it sends a real request to the gateway
-and follows it along the gate track, so nothing a visitor sees there is
-simulated, and the tag above the headline says live only while every subsystem
-is live.
+fewest words that carry the idea. Try it and Start here send a real request to
+the gateway only while a wallet is connected, and follow it along the gate
+track, so nothing a visitor sees there is simulated and nobody spends the
+agent's budget anonymously. The tag above the headline says live only while
+every subsystem is live.

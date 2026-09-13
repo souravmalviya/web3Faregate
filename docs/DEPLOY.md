@@ -148,8 +148,10 @@ local work.
 ## What a visitor can do on the live dashboard
 
 - Read everything: passports, requests, payments, data and the audit log.
-- Send a request as either agent from **Start here** on the Requests page, or
-  from **Try it** on the front page.
+- Connect a wallet, then send a request as either agent from **Start here** on
+  the Requests page, or from **Try it** on the front page. Without a connected
+  wallet the dashboard sends nothing, so nobody spends the agent's budget
+  anonymously. Agents still call the gateway directly with their passports.
 - Approve or reject with their own wallet, on any network: the dashboard only
   asks the wallet to sign a message. Signatures prove who acted, not that they
   were entitled to; the gateway is single-tenant and its read API is open, as

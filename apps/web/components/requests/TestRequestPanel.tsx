@@ -38,9 +38,9 @@ export function TestRequestPanel() {
       const r = out.request;
       setOutcome(
         r.status === 'awaiting_approval'
-          ? `Waiting for your signature: ${usd(r.estimatedCostUsd)}. It is at the top of the list.`
+          ? `Waiting for your signature: ${usd(r.estimatedCostUsd)}. It is at the top of the list. After you approve, open it for the command that collects and pays for it.`
           : r.status === 'payment_required'
-            ? `Cleared by the passport at ${usd(r.estimatedCostUsd)}. The agent pays when it collects.`
+            ? `Cleared by the passport at ${usd(r.estimatedCostUsd)}. Open it in the list for the command that collects and pays for it.`
             : `Refused: ${r.decision?.reasons[0]?.message ?? 'the passport check failed'}`,
       );
       await refresh();
@@ -106,7 +106,8 @@ export function TestRequestPanel() {
         </div>
         {outcome ? <p className="text-[12.5px] leading-relaxed text-ink">{outcome}</p> : null}
         <p className="text-[11.5px] leading-snug text-muted">
-          Creates the request only. Nothing is paid until an agent collects the data with its own wallet.
+          Sends the ask the way an agent would, but no agent is waiting on it. Nothing is paid until an agent collects
+          it with its own wallet; each request shows the command.
         </p>
       </form>
     </section>

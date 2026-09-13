@@ -4,7 +4,7 @@ import { RESOURCE_LABELS, type AccessRequest, type AuditEvent } from '@faregate/
 import { Check, ChevronRight, ExternalLink, X } from 'lucide-react';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 
-import { api, clockTime, hashscanUrl, shortAddress, shortHash, usd } from '@/lib/api';
+import { GATEWAY_IS_LOCAL, GATEWAY_URL, api, clockTime, hashscanUrl, shortAddress, shortHash, usd } from '@/lib/api';
 
 import { EVENT_LABEL, describeEvent } from '../audit/events';
 import { useConsole } from '../console/ConsoleProvider';
@@ -279,16 +279,15 @@ function DecisionBody({ request }: { request: AccessRequest }) {
 function PaymentBody({ request, network }: { request: AccessRequest; network: string }) {
   const payment = request.payment;
   if (!payment) {
+    if ((request.status === 'payment_required' && !request.lastRefusal) || request.status === 'failed') {
+      return <CollectHint request={request} />;
+    }
     const note =
       request.status === 'awaiting_approval'
         ? 'No fare is paid until you approve.'
         : request.status === 'payment_required'
-          ? request.lastRefusal
-            ? 'Refused at the gate before payment. Nothing was paid.'
-            : 'Cleared. The agent pays when it collects the data.'
-          : request.status === 'failed'
-            ? 'Data retrieval failed, so the fare was not settled.'
-            : 'Refused before a price was quoted. Nothing was paid.';
+          ? 'Refused at the gate before payment. Nothing was paid.'
+          : 'Refused before a price was quoted. Nothing was paid.';
     return <p className="text-[13px] leading-relaxed text-ink-2">{note}</p>;
   }
 
@@ -349,6 +348,39 @@ function PaymentBody({ request, network }: { request: AccessRequest; network: st
         </dd>
       </dl>
       {txUrl ? <p className="mt-2 text-[11.5px] text-muted">Opens the transfer on HashScan.</p> : null}
+    </>
+  );
+}
+
+/**
+ * The console never pays. An agent collects a cleared request and pays the
+ * fare from its own wallet. One that asked from the terminal is still waiting
+ * and collects on its own; a request sent from the test panel has no agent
+ * behind it, so the row gives the command that collects it.
+ */
+function CollectHint({ request }: { request: AccessRequest }) {
+  const command = [
+    'npm run agent --',
+    ...(GATEWAY_IS_LOCAL ? [] : ['--gateway', GATEWAY_URL]),
+    '--request',
+    request.id,
+  ].join(' ');
+  return (
+    <>
+      <p className="text-[13px] leading-relaxed text-ink-2">
+        {request.status === 'failed'
+          ? 'Data retrieval failed and nothing was charged. The agent can collect it again.'
+          : 'Waiting for the agent. It pays the fare from its own wallet when it collects the data; this page never pays.'}
+      </p>
+      <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
+        An agent that asked from the terminal collects on its own. For a request sent from this page, run the demo
+        agent on the machine that holds its key:
+      </p>
+      <CopyText
+        wrap
+        value={command}
+        className="mt-1.5 max-w-full rounded-[2px] bg-sheet-2 px-2 py-1 font-mono text-[11.5px] text-ink"
+      />
     </>
   );
 }

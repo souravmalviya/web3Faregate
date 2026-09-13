@@ -173,6 +173,7 @@ live, reads them from the chain at startup.
 | `429 rate_limited` | An agent submitted too fast | Wait for the `Retry-After` seconds, or raise `FAREGATE_RATE_LIMIT_REQUESTS_PER_MINUTE` |
 | Restart did not reset the demo | State persists in `data/faregate-state.json` | `npm run reset`, then restart |
 | Agent prints `Gateway is not reachable` | Same as above | Set `FAREGATE_GATEWAY_URL` if the gateway is not on `:8402` |
+| A request sent from the dashboard's test panel stays "Approved, waiting for the agent" | That panel has no agent behind it | Run the command shown in the request's details, or ask from the terminal with `npm run agent` so the agent is waiting when you approve |
 | Agent waits forever | Nobody approved | Approve in the dashboard; `npm run agent -- --wait 300` gives you five minutes |
 | Requests say "Read by the rule-based parser" although a model key is set | The hourly model budget is used up, or OpenRouter is failing | Check the gateway log; wait, or raise `FAREGATE_AI_CALLS_PER_HOUR` |
 | `payment: simulated` although `FAREGATE_PAY_TO` is set | `.env` not at the repo root | The gateway loads `.env` from the repository root only |

@@ -98,14 +98,15 @@ export function verdictFor(r: AccessRequest): Verdict {
         ? {
             tone: 'brand',
             stamp: 'Cleared',
-            line: 'Approved, not paid yet',
-            detail: 'Approved. The agent pays the fare when it collects the data.',
+            line: 'Approved, waiting for the agent',
+            detail: 'Approved. Nothing is paid until the agent comes back to collect the data and pays the fare from its own wallet.',
           }
         : {
             tone: 'brand',
             stamp: 'Cleared',
-            line: 'Within limits, not paid',
-            detail: 'Within every limit, so no approval was needed. The agent pays when it collects the data.',
+            line: 'Waiting for the agent',
+            detail:
+              'Within every limit, so no approval was needed. Nothing is paid until the agent comes back to collect the data and pays the fare from its own wallet.',
           };
     case 'fulfilled': {
       const p = r.payment;

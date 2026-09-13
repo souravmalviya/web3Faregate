@@ -13,6 +13,8 @@
  *   npm run agent -- --agent trial.agents.faregate.eth --ask "..."
  *   npm run agent -- --request <id>     collect a quote this agent already holds (the revocation moment)
  *   npm run agent -- --wait 300         seconds to wait for a human, default 120
+ *   npm run agent -- --gateway https://faregate-gateway.onrender.com --request <id>
+ *                                       any of the above against another gateway than FAREGATE_GATEWAY_URL
  */
 
 import { config as loadDotenv } from 'dotenv';
@@ -28,7 +30,14 @@ import { ExactHederaScheme, PrivateKey, createClientHederaSigner } from '@x402/h
 // cwd-relative load would silently leave the agent without its wallet.
 loadDotenv({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env') });
 
-const GATEWAY = process.env.FAREGATE_GATEWAY_URL ?? 'http://localhost:8402';
+// `--gateway <url>` wins over FAREGATE_GATEWAY_URL, so the command the
+// dashboard shows for a request works whichever gateway .env points at.
+const gatewayFlag = process.argv.indexOf('--gateway');
+const GATEWAY = (
+  (gatewayFlag >= 0 ? process.argv[gatewayFlag + 1] : undefined) ??
+  process.env.FAREGATE_GATEWAY_URL ??
+  'http://localhost:8402'
+).replace(/\/+$/, '');
 const NETWORK = process.env.FAREGATE_NETWORK ?? 'hedera:testnet';
 
 const DEFAULT_AGENT = 'research.agents.faregate.eth';

@@ -120,14 +120,35 @@ transaction ids line up and read as exact values.
 
 | Page | Purpose |
 |---|---|
-| **Requests** | Waiting approvals, then every request. Rail: passports, a test request form, gateway status. |
+| **Home** (`/`) | The front page for a first-time visitor: what Faregate is, the problem, the five stops, a real request to try, the four answers, proof, and who it is for. |
+| **Requests** (`/requests`) | Start here (choose an agent, choose an ask with the gate's likely answer beside it, send it), then waiting approvals and every request. Rail: passports and gateway status. |
 | **Passports** | Each agent's identity, limits, allowed data and spend; how to revoke. |
 | **Ledger** | Every fare collected, with the Hedera transaction. |
 | **Audit log** | The append-only record, filterable by actor and text. |
 
 ## 7. Things deliberately left out
 
-Gradients, glow, glass panels, oversized hero headings, decorative
-illustration, entrance animations, pill buttons, and robot or sparkle icons.
-Each was considered and rejected because it adds no information about agents,
-limits or money.
+Gradients, glow, glass panels, entrance animations, pill buttons, and robot or
+sparkle icons. Each was considered and rejected because it adds no information
+about agents, limits or money.
+
+## 8. The front page
+
+The console is built for an owner who already knows the product. The first
+people to open the live link do not: a first-time visitor could not tell what
+Faregate solves. So the front page is the one place with a large headline and
+drawings, under two rules.
+
+1. **Every drawing shows something real.** The hero is the console itself: a
+   request waiting for approval, a settled fare, the passport and the agent's
+   terminal. The five stops, the open card against the passport, the stamped
+   tickets and the receipts all use the product's own objects and numbers.
+2. **The console's materials.** Paper, ink, stamp blue and the verdict colours;
+   the condensed signage face; stamps, tickets and the gate track. Soft
+   shadows only on things drawn as lifted off the page.
+
+Copy uses Faregate's own terms (passport, approval line, fare, revoke) and the
+fewest words that carry the idea. Try it sends a real request to the gateway
+and follows it along the gate track, so nothing a visitor sees there is
+simulated, and the tag above the headline says live only while every subsystem
+is live.

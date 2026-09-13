@@ -38,7 +38,8 @@ About ten minutes, all off camera.
    `payment live`, `data live`, `ai live`, `ens live`,
    `2 passport(s) read from ENS at startup`, then `paid collection is open`.
 7. **Dashboard**, terminal 2, off camera: `npm run dev:web`. Wait for `Ready`,
-   then open http://localhost:3000 in Chrome.
+   then open http://localhost:3000 in Chrome. That is the front page; the
+   console is under "Requests" in the top menu.
 8. **Wallet.** Unlock MetaMask. Tip: switch to a new, empty MetaMask account
    for the video, so your main wallet address is not recorded. Signing needs
    no funds.
@@ -50,8 +51,10 @@ About ten minutes, all off camera.
     payment on camera.
 11. **Camera terminal.** Open Windows Terminal in the `faregate` folder, make
     the text bigger (Ctrl and plus, about size 16), type `cls` and press Enter.
-12. **Start state.** The dashboard shows the green "Live" readout, "No
-    requests yet", and both passports "ACTIVE" on the right.
+12. **Start state.** Click "Requests" in the top menu and click "Hide" on the
+    "Start here" box; the page remembers. It shows "No requests yet" and both
+    passports "ACTIVE" on the right. Click "Home" to go back to the front page,
+    which shows the green "Live on testnet" tag and the "Live" readout.
 
 Balances on 13 September 2026: the agent holds 19.95 test USDC (a take spends
 0.036) and the ENS owner holds 0.047 Sepolia ETH (`ens:restore` needs at least
@@ -77,12 +80,13 @@ Optional: rehearse once without recording, then repeat steps 3 to 12.
 
 ## Scene 1. The problem (0:00 to 0:20)
 
-**DO** Start recording on the "Requests" page. Rest the mouse on an empty part
-of the page and click nothing.
+**DO** Start recording on the front page. Rest the mouse on an empty part of
+the page. After the first sentence, scroll down slowly until "Don’t hand an
+agent an open card" fills the screen.
 
-**SEE** The title "Requests" and four figures: "NEEDS YOU 0", "SPENT TODAY
-$0.00", "SETTLED FARES 0", "REFUSED 0". Under "All requests": "No requests
-yet".
+**SEE** The headline "AI agents buy data. You set the rules." beside a picture
+of the console. Then a dark card stamped "NO LIMIT" next to a blue passport
+stamped "ACTIVE".
 
 **SAY**
 > AI agents can now work on their own. To be useful, they need data, and they
@@ -326,5 +330,5 @@ request from this agent is refused at the gate."
 | Part of the readout is amber and says simulated | The gateway is missing a setting in `.env`. Stop and fix it before recording. |
 | HashScan says the transaction was not found | The explorer can be a few seconds behind. Refresh the tab once. |
 | The dashboard says it can't reach the gateway | The gateway terminal stopped. Start `npm run dev:api` again. |
-| A request sent from the "Send a test request" panel stays "Approved, waiting for the agent" | Expected. That panel sends the ask with no agent behind it, so nothing collects or pays. In the video the agent asks from the terminal (scene 4) and is still waiting when you approve, so it pays on its own. To finish a panel request, run the command shown in its details. On the live site the demo agent collects it by itself. |
+| A request sent from the "Start here" box stays "Approved, waiting for the agent" | Expected. That box sends the ask with no agent behind it, so nothing collects or pays. In the video the agent asks from the terminal (scene 4) and is still waiting when you approve, so it pays on its own. To finish such a request, run the command shown in its details. On the live site the demo agent collects it by itself. |
 | The agent prints `HTTP 503` with `payment_unavailable` | The gateway had not finished checking the payment facilitator. Wait for `paid collection is open` in the gateway terminal, then run the agent again. |

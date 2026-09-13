@@ -122,7 +122,7 @@ and collects the data within a few seconds.
 2. Save. After the redeploy, the log shows
    `[faregate] agent    demo agent 0.0.… collects cleared requests for …`, and
    the dashboard's Gateway panel lists an Agent row.
-3. Send a test request from the dashboard and approve it. Within a few seconds
+3. Send a request from Start here on the Requests page and approve it. Within a few seconds
    the row turns Delivered, with a HashScan link.
 
 This puts a throwaway testnet key on the host, on purpose. It holds test USDC

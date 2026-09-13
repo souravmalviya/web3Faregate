@@ -35,8 +35,8 @@ About ten minutes, all off camera.
 5. **Empty request list.** Run `npm run reset`. You see
    `gateway state cleared`.
 6. **Gateway**, terminal 1, off camera: `npm run dev:api`. Wait for
-   `payment live`, `data live`, `ai live`, `ens live` and
-   `2 passport(s) read from ENS at startup`.
+   `payment live`, `data live`, `ai live`, `ens live`,
+   `2 passport(s) read from ENS at startup`, then `paid collection is open`.
 7. **Dashboard**, terminal 2, off camera: `npm run dev:web`. Wait for `Ready`,
    then open http://localhost:3000 in Chrome.
 8. **Wallet.** Unlock MetaMask. Tip: switch to a new, empty MetaMask account
@@ -326,3 +326,4 @@ request from this agent is refused at the gate."
 | Part of the readout is amber and says simulated | The gateway is missing a setting in `.env`. Stop and fix it before recording. |
 | HashScan says the transaction was not found | The explorer can be a few seconds behind. Refresh the tab once. |
 | The dashboard says it can't reach the gateway | The gateway terminal stopped. Start `npm run dev:api` again. |
+| The agent prints `HTTP 503` with `payment_unavailable` | The gateway had not finished checking the payment facilitator. Wait for `paid collection is open` in the gateway terminal, then run the agent again. |

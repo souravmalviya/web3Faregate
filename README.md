@@ -2,6 +2,12 @@
 
 **Agents buy onchain data by the query. Humans decide what they are allowed to buy.**
 
+[![CI](https://github.com/souravmalviya/web3Faregate/actions/workflows/ci.yml/badge.svg)](https://github.com/souravmalviya/web3Faregate/actions/workflows/ci.yml)
+
+**Live, on test networks only:** [dashboard](https://web3-faregate-web.vercel.app) ·
+[gateway health](https://faregate-gateway.onrender.com/health). No real money
+moves anywhere.
+
 Faregate is a permission and payment gateway between AI agents and paid
 blockchain data. An agent asks for data in plain language. The gateway works
 out what it is asking for, checks a capability its human owner set, prices the
@@ -207,7 +213,7 @@ Turn subsystems live one at a time in `.env`:
 | `OPENROUTER_API_KEY` | unset (AI rule-based) | OpenRouter key |
 | `OPENROUTER_MODEL` | `openai/gpt-4.1-mini` | Any OpenRouter model with structured outputs |
 | `FAREGATE_AI_CALLS_PER_HOUR` | `300` | Model calls allowed an hour across all callers; past it the rule-based parser answers |
-| `ENS_RPC_URL` | unset (passports local) | Sepolia RPC for ENSv2 resolution |
+| `ENS_RPC_URL` | unset (passports local) | Sepolia RPC for ENSv2 resolution; comma-separate fallbacks, tried in order |
 | `FAREGATE_PARENT_NAME` | `agents.faregate.eth` | Parent name passports live under |
 | `ENS_UNIVERSAL_RESOLVER` | ENSv2 beta address | Override only if ENS redeploys |
 | `ENS_OWNER_PRIVATE_KEY` | unset | Throwaway Sepolia key, read only by `scripts/ens` (`ens:setup`, `ens:revoke`, `ens:restore`) |
@@ -247,7 +253,7 @@ npm run agent -- --agent research.agents.faregate.eth --request <id>
 ## Tests
 
 ```bash
-npm test          # 124 tests: policy engine, pricing, signed actions, store persistence, rate limiting, AI grounding, data fan-out, identity fail-closed, HTTP surface
+npm test          # 141 tests: policy engine, pricing, signed actions, store persistence and bounds, rate limiting, CORS, AI grounding and budget, data fan-out, identity fail-closed, payment readiness, HTTP surface
 npm run e2e:live -- --yes   # live, testnet: real Hedera payments, Graph data, AI, ENS revoke and restore
 npm run typecheck
 npm run lint      # ESLint on the dashboard
@@ -265,7 +271,12 @@ revocation before and after approval, and the audit trail order.
 The gateway runs on a free Render instance (`render.yaml`), the dashboard on
 Vercel's Hobby plan (`apps/web/vercel.json`), and the agent stays on your
 machine with the only key that can spend anything. Everything stays on test
-networks. Step by step in [docs/DEPLOY.md](docs/DEPLOY.md).
+networks. A scheduled GitHub workflow keeps the free gateway from sleeping,
+and CI runs every check on each push. Step by step in
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
+Live now: [web3-faregate-web.vercel.app](https://web3-faregate-web.vercel.app),
+talking to [faregate-gateway.onrender.com](https://faregate-gateway.onrender.com/health).
 
 ## Limitations
 

@@ -9,7 +9,7 @@ it says otherwise.
 ```bash
 npm install && cp .env.example .env
 npm run build --workspace @faregate/shared
-npm test                       # 124 tests
+npm test                       # 141 tests
 npm run e2e:live -- --yes      # live: real payment, Graph data, ENS revoke and restore
 npm run dev:api                # :8402
 npm run dev:web                # :3000

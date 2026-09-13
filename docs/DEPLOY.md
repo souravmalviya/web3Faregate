@@ -19,13 +19,18 @@ the gateway account's key and the ENS owner key never leave your machine.
 ## What free means here
 
 - A free Render instance sleeps after 15 minutes without traffic and takes up
-  to a minute to wake. The dashboard polls every two seconds, so while a
-  dashboard tab is open the gateway stays awake. Open `/health` a minute
-  before a demo.
-- Its disk is wiped on every deploy and every wake. The request queue, spend
+  to a minute to wake. The repository's **Keep the gateway awake** workflow
+  (`.github/workflows/keep-gateway-awake.yml`) pings `/health` every ten
+  minutes on GitHub's free minutes, so it normally stays up. If it does sleep,
+  the dashboard says the gateway is waking and connects by itself.
+- Render gives 750 free instance hours a month, enough for one service to run
+  all month. If other free Render services share your workspace, disable that
+  workflow in the **Actions** tab so they keep their hours.
+- The disk is wiped on every deploy and every wake. The request queue, spend
   ledger and used signatures start empty; the passports come from Sepolia and
   are unaffected. `SECURITY.md` says what that means.
-- 750 free instance hours a month: one service, running all month.
+- ENS is read through two public Sepolia RPCs (`ENS_RPC_URL` in
+  `render.yaml`), so one provider's outage does not refuse every agent.
 - Vercel Hobby is free for personal projects. The dashboard builds in about
   two minutes.
 
@@ -55,15 +60,16 @@ the gateway account's key and the ENS owner key never leave your machine.
    | `GRAPH_SUBGRAPHS` | from `.env`, the whole `aave-v3=...,compound-v3=...,spark-lend=...` line |
    | `OPENROUTER_API_KEY` | from `.env` |
 
-3. **Apply**. The first build takes three to five minutes. The log ends with
+3. **Apply**. The first build takes three to five minutes. The log shows
    `gateway listening`, then `payment live`, `data live`, `ai live`,
-   `ens live`.
+   `ens live`, and a moment later `paid collection is open`.
 4. Copy the service URL, `https://faregate-gateway-xxxx.onrender.com`, and open
    `<that url>/health`. Every mode says `live` and `notes` is empty.
 
-If the deploy fails with `payment facilitator check failed`, Blocky402's
-testnet host was unreachable at that moment. **Manual Deploy** → **Deploy
-latest commit** to try again.
+If Blocky402's testnet host is unreachable when the gateway starts, the
+gateway starts anyway: `/health` carries a note, paid collection answers 503
+and charges nothing, and the gateway checks again every 30 seconds until the
+log says `paid collection is open`.
 
 ## 2. Dashboard on Vercel
 

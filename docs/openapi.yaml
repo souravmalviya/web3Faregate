@@ -30,6 +30,14 @@ tags:
   - name: system
 
 paths:
+  /:
+    get:
+      tags: [system]
+      summary: What this service is, with links to its health check, API description and source.
+      responses:
+        '200':
+          description: OK
+
   /health:
     get:
       tags: [system]
@@ -303,6 +311,11 @@ paths:
           description: |
             The data provider failed. The payment is not settled, so nothing is
             charged, and the request can be collected again.
+        '503':
+          description: |
+            The payment facilitator has not confirmed yet that it settles on
+            this network, for example just after the gateway started. Nothing
+            is charged. Retry after the `Retry-After` seconds.
 
   /events:
     get:
@@ -565,6 +578,7 @@ components:
         network: { type: string }
         parentName: { type: string, description: Parent name new passports are created under. }
         signedActions: { type: boolean }
+        paymentReady: { type: boolean, description: False while live payments wait for the facilitator. }
         persistence: { type: string }
         modes:
           type: object

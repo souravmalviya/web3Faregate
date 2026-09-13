@@ -123,6 +123,8 @@ the Sepolia registrar in its free MockUSDC.
 ## Links
 
 - GitHub: https://github.com/souravmalviya/web3Faregate
+- Live dashboard (test networks only): https://web3-faregate-web.vercel.app
+- Live gateway: https://faregate-gateway.onrender.com/health
 - Demo video: `[add the link]`
 - ENS passport records on Sepolia: https://sepolia.etherscan.io/tx/0x1bb5f46d0fbeec04e896318a365b58719e224a45d837df2153abc4fd610e055a
 - ENS resolver on Sepolia: https://sepolia.etherscan.io/address/0xc305b40688D41bf05635Ab6cbc1ec0cb7FF18862

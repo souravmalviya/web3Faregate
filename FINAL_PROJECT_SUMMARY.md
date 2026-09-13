@@ -220,8 +220,10 @@ authenticated reads, shared persistent state, HCS anchoring, and a
 facilitator with an SLA. Signed actions, rate limits and the model-call
 budget are already in.
 
-**If a sponsor service is down?** Identity fails closed for ENS passports.
-Data fails loudly. Payment cannot be verified, so no data is released.
+**If a sponsor service is down?** ENS reads fall back through two Sepolia
+RPCs and fail closed if both are down. Data fails loudly. If the payment
+facilitator is unreachable, paid collection pauses with a 503, nothing is
+charged, and the gateway keeps checking until it answers.
 
 ## 13. Three-minute pitch
 

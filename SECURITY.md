@@ -94,6 +94,15 @@ analysis is answered by the rule-based provider and the gateway logs the
 switch once. Request submission is open, so this is what puts a ceiling on
 the model bill.
 
+**One passport, one spelling.** Agent ids are normalised as ENS names before
+they key anything (`apps/api/src/identity/names.ts`), so writing a passport
+name in capitals cannot open a second daily budget or a second rate limit.
+
+**The model cannot invent a subject.** A model's proposal must be about an
+address the agent's request actually contains. A placeholder zero address, or
+an address the request never mentioned, is discarded and the rule-based parser
+answers, so a request that names no wallet is refused instead of priced.
+
 **Unknown passports never reach the model.** Identity is resolved before
 interpretation. A request from a name with no passport is parsed by the free
 rule-based parser and refused, so nobody can spend model credits by inventing
@@ -136,6 +145,17 @@ provider that fails, fails; it never falls back to simulated data.
   its ten-minute window could be replayed after one. Passports are unaffected
   because they live on Sepolia. Acceptable for a testnet demo; not for real
   money, which would need shared persistent state.
+
+## Staying up
+
+- A payment facilitator that is unreachable when the gateway starts pauses
+  paid collection (503, nothing charged) instead of stopping the gateway, and
+  is checked again every 30 seconds.
+- ENS reads fall back through several Sepolia RPCs, so one provider's outage
+  does not refuse every agent. If all of them fail, identity still fails
+  closed.
+- A failed snapshot write or a stray promise rejection is logged, never fatal.
+- Every in-memory table and every list the API returns is bounded.
 
 ## Secrets
 

@@ -37,7 +37,7 @@ import type { x402HTTPResourceServer } from '@x402/core/server';
 import { paymentMiddlewareFromHTTPServer } from '@x402/express';
 
 import type { AIProvider } from './ai/provider.ts';
-import { describeModes, type AppConfig } from './config.ts';
+import { corsAllowList, describeModes, type AppConfig } from './config.ts';
 import type { DataProvider } from './data/provider.ts';
 import { HttpError } from './errors.ts';
 import { actionEnvelopeSchema, authorizeHumanAction } from './human-auth.ts';
@@ -151,7 +151,9 @@ export function createApp(deps: AppDeps): Express {
   // from untrusted input and carries its own advisories.
   app.set('query parser', 'simple');
   app.use(express.json({ limit: '64kb' }));
-  app.use(cors({ origin: config.corsOrigins }));
+  // Browsers may call the gateway only from the dashboard's origins. A
+  // preflight is cached for ten minutes rather than repeated before each call.
+  app.use(cors({ origin: corsAllowList(config.corsOrigins), maxAge: 600 }));
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', 1);
 

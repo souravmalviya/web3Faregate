@@ -3,7 +3,7 @@
 import { Check, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { GATEWAY_URL, shortAddress } from '@/lib/api';
 import { EXPECTED_CHAIN } from '@/lib/wallet';
@@ -76,11 +76,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 pb-16 pt-8">
         {error ? (
           <div className="mb-6">
-            <Notice tone="stop">
-              Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. Locally, start it with{' '}
-              <code className="font-mono">npm run dev:api</code>. A hosted gateway on a free plan can take a minute to
-              wake. Retrying every 2 seconds.
-            </Notice>
+            <GatewayUnreachable />
           </div>
         ) : null}
         {wallet.error ? (
@@ -111,6 +107,40 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <Toast />
     </div>
+  );
+}
+
+const LOCAL_GATEWAY = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(GATEWAY_URL);
+
+/**
+ * A browser cannot tell a sleeping gateway from one that refuses this page's
+ * origin: both are a failed fetch. So a hosted gateway gets both causes, and
+ * the exact origin to allow.
+ */
+function GatewayUnreachable() {
+  // Read after mount: the page is prerendered, where there is no window.
+  const [origin, setOrigin] = useState<string | null>(null);
+  useEffect(() => setOrigin(window.location.origin), []);
+
+  if (LOCAL_GATEWAY) {
+    return (
+      <Notice tone="stop">
+        Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. Start it with{' '}
+        <code className="font-mono">npm run dev:api</code>. Retrying every 2 seconds.
+      </Notice>
+    );
+  }
+  return (
+    <Notice tone="stop">
+      Can&apos;t reach the gateway at <span className="font-mono">{GATEWAY_URL}</span>. A free instance takes up to a
+      minute to wake, and this page retries every 2 seconds. If{' '}
+      <a href={`${GATEWAY_URL}/health`} target="_blank" rel="noreferrer" className="font-mono underline">
+        /health
+      </a>{' '}
+      opens in a new tab but this message stays, the gateway is refusing this page: add{' '}
+      <code className="font-mono">{origin ?? 'this page’s address'}</code> to{' '}
+      <code className="font-mono">FAREGATE_CORS_ORIGIN</code> on the gateway.
+    </Notice>
   );
 }
 

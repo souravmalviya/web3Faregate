@@ -155,6 +155,23 @@ function start(): void {
           : 'UNSIGNED human actions accepted (FAREGATE_REQUIRE_SIGNED_ACTIONS=false)'
       }`,
     );
+    // A dashboard on an origin missing here sees the gateway as unreachable,
+    // with nothing in this log unless the origins are printed.
+    console.log(
+      `[faregate] cors     ${
+        config.corsOrigins.length > 0
+          ? `browser origins ${config.corsOrigins.join(', ')}`
+          : 'no browser origin may call this gateway'
+      }`,
+    );
+    for (const { entry, reason } of config.corsIgnored ?? []) {
+      console.warn(`[faregate] cors     ignored "${entry}": ${reason}`);
+    }
+    if (config.corsOrigins.includes('https://example.invalid')) {
+      console.warn(
+        '[faregate] cors     https://example.invalid is a placeholder. Set FAREGATE_CORS_ORIGIN to the dashboard address, or the hosted dashboard cannot reach this gateway.',
+      );
+    }
     for (const note of notes) console.log(`[faregate] note: ${note}`);
   });
 

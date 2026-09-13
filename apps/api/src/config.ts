@@ -133,8 +133,13 @@ export interface RateLimitConfig {
 
 export interface AppConfig {
   port: number;
-  /** Origins the dashboard may call from. Comma-separated in the environment. */
+  /**
+   * Browser origins allowed to call the gateway: exact origins, or patterns in
+   * which `*` stands for one DNS label. See `parseCorsOrigins`.
+   */
   corsOrigins: string[];
+  /** Entries in FAREGATE_CORS_ORIGIN that were not usable, reported at startup. */
+  corsIgnored?: IgnoredOrigin[];
   /**
    * Trust the first X-Forwarded-For hop. Needed behind a hosting provider's
    * proxy, otherwise every caller shares the proxy's address and one per-caller
@@ -248,13 +253,76 @@ function loadStateFile(): string | null {
   return path.isAbsolute(raw) ? raw : path.resolve(REPO_ROOT, raw);
 }
 
+export const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
+
+export interface IgnoredOrigin {
+  entry: string;
+  reason: string;
+}
+
+/** Scheme, host and optional port, with `*` allowed inside host labels. */
+const ORIGIN_PATTERN_RE = /^https?:\/\/[a-z0-9*-]+(\.[a-z0-9*-]+)*(:\d{1,5})?$/;
+
+/** A `*` that is a whole label, as in `https://*.vercel.app`. */
+const WHOLE_LABEL_WILDCARD_RE = /(\/\/|\.)\*(\.|:|$)/;
+
+/**
+ * Reads FAREGATE_CORS_ORIGIN: comma-separated origins, each optionally with a
+ * `*` standing for one DNS label, so every deployment address of one Vercel
+ * project can be allowed with one entry.
+ *
+ * A browser sends its origin as lowercase scheme and host with no path, so each
+ * entry is lowercased and a trailing slash dropped: pasting
+ * `https://faregate.vercel.app/` from the address bar must not lock the
+ * dashboard out. An entry that is still not an origin, such as a URL with a
+ * path, or a wildcard broad enough to admit every site on a shared domain, is
+ * returned in `ignored` so the startup log says why, instead of silently never
+ * matching.
+ */
+export function parseCorsOrigins(raw: string | undefined): { origins: string[]; ignored: IgnoredOrigin[] } {
+  const origins: string[] = [];
+  const ignored: IgnoredOrigin[] = [];
+  for (const entry of (raw ?? DEFAULT_CORS_ORIGIN).split(',')) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const candidate = trimmed.toLowerCase().replace(/\/+$/, '');
+    if (!ORIGIN_PATTERN_RE.test(candidate)) {
+      ignored.push({ entry: trimmed, reason: 'an origin is a scheme and host only, like https://faregate.vercel.app' });
+    } else if (WHOLE_LABEL_WILDCARD_RE.test(candidate)) {
+      ignored.push({
+        entry: trimmed,
+        reason: 'a * must sit inside a label, like https://faregate-*.vercel.app; on its own it would admit every site on that domain',
+      });
+    } else {
+      origins.push(candidate);
+    }
+  }
+  return { origins, ignored };
+}
+
+/**
+ * The list the CORS middleware matches a request's Origin against: exact
+ * strings, and a RegExp for each pattern in which `*` matches one DNS label and
+ * never a dot, so `https://faregate-*.vercel.app` cannot match
+ * `https://faregate-x.attacker.vercel.app`.
+ */
+export function corsAllowList(origins: readonly string[]): Array<string | RegExp> {
+  return origins.map((origin) => {
+    if (!origin.includes('*')) return origin;
+    const source = origin
+      .split('*')
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[a-z0-9-]+');
+    return new RegExp(`^${source}$`);
+  });
+}
+
 export function loadConfig(): AppConfig {
+  const cors = parseCorsOrigins(str('FAREGATE_CORS_ORIGIN'));
   return {
     port: int('PORT', 8402),
-    corsOrigins: (str('FAREGATE_CORS_ORIGIN') ?? 'http://localhost:3000')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
+    corsOrigins: cors.origins,
+    corsIgnored: cors.ignored,
     trustProxy: bool('FAREGATE_TRUST_PROXY', false),
     requireSignedActions: bool('FAREGATE_REQUIRE_SIGNED_ACTIONS', true),
     stateFile: loadStateFile(),

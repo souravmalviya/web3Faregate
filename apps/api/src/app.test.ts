@@ -9,7 +9,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Server } from 'node:http';
+import { request as httpRequest, type Server } from 'node:http';
 
 import { privateKeyToAccount } from 'viem/accounts';
 
@@ -903,6 +903,71 @@ test('one caller cannot dodge the passport limit by inventing names', async () =
     const sixth = await submit(h, 'made-up-5.agents.faregate.eth', `balance of ${SUBJECT} today`);
     assert.equal(sixth.status, 429);
     assert.equal(sixth.body.error.code, 'rate_limited');
+  } finally {
+    await h.close();
+  }
+});
+
+// --- browser origins ---------------------------------------------------------
+
+interface PreflightVerdict {
+  status: number;
+  allowOrigin: string | undefined;
+  maxAge: string | undefined;
+}
+
+/** Sends the CORS preflight a browser sends before a JSON POST, and reads the answer. */
+function preflight(h: Harness, origin: string): Promise<PreflightVerdict> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      `${h.url}/requests`,
+      {
+        method: 'OPTIONS',
+        headers: {
+          origin,
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type',
+        },
+      },
+      (res) => {
+        res.resume();
+        const header = (name: string): string | undefined => {
+          const value = res.headers[name];
+          return Array.isArray(value) ? value[0] : value;
+        };
+        resolve({
+          status: res.statusCode ?? 0,
+          allowOrigin: header('access-control-allow-origin'),
+          maxAge: header('access-control-max-age'),
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('only the dashboard origins, named or matched by a one-label wildcard, may call from a browser', async () => {
+  const h = await boot({
+    corsOrigins: ['https://web3-faregate.vercel.app', 'https://web3-faregate-*-team.vercel.app'],
+  });
+  try {
+    const named = await preflight(h, 'https://web3-faregate.vercel.app');
+    assert.equal(named.status, 204);
+    assert.equal(named.allowOrigin, 'https://web3-faregate.vercel.app');
+    assert.equal(named.maxAge, '600');
+
+    const deployment = await preflight(h, 'https://web3-faregate-mctorm9a9-team.vercel.app');
+    assert.equal(deployment.allowOrigin, 'https://web3-faregate-mctorm9a9-team.vercel.app');
+
+    // Any other page gets no permission header, so its browser withholds the response.
+    for (const origin of [
+      'https://example.invalid',
+      'https://web3-faregate-x.attacker-team.vercel.app',
+      'http://localhost:3000',
+    ]) {
+      assert.equal((await preflight(h, origin)).allowOrigin, undefined, origin);
+    }
   } finally {
     await h.close();
   }

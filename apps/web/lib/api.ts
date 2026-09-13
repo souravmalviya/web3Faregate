@@ -19,8 +19,8 @@ import {
   type Policy,
 } from '@faregate/shared';
 
-export const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_FAREGATE_GATEWAY_URL ?? 'http://localhost:8402';
+/** No trailing slash, so a pasted `https://gateway.example/` still builds `/health`, not `//health`. */
+export const GATEWAY_URL = (process.env.NEXT_PUBLIC_FAREGATE_GATEWAY_URL ?? 'http://localhost:8402').replace(/\/+$/, '');
 
 export type SubsystemMode = 'live' | 'simulated';
 
@@ -76,7 +76,9 @@ export class GatewayError extends Error {
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${GATEWAY_URL}${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    // Only a request with a body declares JSON. A bodiless GET then stays a
+    // simple request, so polling a hosted gateway sends no preflight.
+    headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), ...(init?.headers ?? {}) },
     cache: 'no-store',
   });
   const body = (await response.json().catch(() => ({}))) as { error?: ApiError } & T;

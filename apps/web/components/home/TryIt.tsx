@@ -11,7 +11,7 @@ import { explainFailure, useConsole } from '../console/ConsoleProvider';
 import { GateTrack } from '../requests/GateTrack';
 import { ASKS, askFare, type Ask, type AskKey } from '../requests/asks';
 import { describeQuery, stationsFor, verdictFor, type Station } from '../requests/model';
-import { Stamp, type Tone } from '../ui';
+import { Button, Stamp, type Tone } from '../ui';
 
 /** The passport the front page asks as, when the gateway has it. */
 const PREFERRED_AGENT = 'research.agents.faregate.eth';
@@ -100,9 +100,11 @@ function toView(request: AccessRequest, note: string, agent: string, network: st
 /**
  * A real request, sent to the gateway the way an agent sends one, then
  * followed along the gate track as the console's polling brings it back.
+ * Sending needs a connected wallet, so nobody spends the agent's budget
+ * anonymously from this page.
  */
 export function TryIt() {
-  const { agents, requests, health, gatewayState, refresh, agentLabel } = useConsole();
+  const { agents, requests, health, gatewayState, refresh, agentLabel, canAct, wallet, connect } = useConsole();
   const [sent, setSent] = useState<AccessRequest | null>(null);
   const [sending, setSending] = useState<AskKey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export function TryIt() {
   const agent =
     agents.find((a) => a.id === PREFERRED_AGENT && a.status === 'active') ?? agents.find((a) => a.status === 'active');
   const network = health?.network ?? 'hedera:testnet';
-  const ready = gatewayState === 'online' && agent !== undefined;
+  const ready = gatewayState === 'online' && agent !== undefined && canAct;
   const autoCollect = (agentId: string) => Boolean(health?.demoAgent?.passports.includes(agentId.toLowerCase()));
 
   const mine = sent ? (requests.find((r) => r.id === sent.id) ?? sent) : null;
@@ -124,7 +126,7 @@ export function TryIt() {
       : EXAMPLE;
 
   async function send(ask: Ask) {
-    if (!agent) return;
+    if (!agent || !canAct) return;
     setError(null);
     setSending(ask.key);
     try {
@@ -147,9 +149,13 @@ export function TryIt() {
         ? 'The gateway cannot be reached right now.'
         : gatewayState === 'connecting'
           ? 'Connecting to the gateway.'
-          : agent
-            ? `Sent as ${agent.label}, the way an agent sends it.`
-            : 'No active passport to send as.';
+          : !canAct
+            ? wallet.available
+              ? 'Connect a wallet to send a request.'
+              : 'Sending needs a browser wallet such as MetaMask.'
+            : agent
+              ? `Sent as ${agent.label}, the way an agent sends it.`
+              : 'No active passport to send as.';
 
   return (
     <div className="grid items-start gap-7 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -174,6 +180,11 @@ export function TryIt() {
             );
           })}
         </div>
+        {!canAct && wallet.available ? (
+          <Button variant="primary" onClick={() => void connect()}>
+            Connect wallet to try
+          </Button>
+        ) : null}
         <p className="text-[12.5px] leading-snug text-muted">{status}</p>
         {error ? (
           <p role="alert" className="text-[12.5px] leading-snug text-stop">

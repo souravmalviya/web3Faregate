@@ -220,7 +220,7 @@ function WalletControl() {
         onClick={() =>
           wallet.available
             ? void connect()
-            : notify('Approving needs a browser wallet such as MetaMask. Everything else on this site works without one.', 'bad')
+            : notify('Sending and approving requests need a browser wallet such as MetaMask. You can look around without one.', 'bad')
         }
       >
         {wallet.available ? 'Connect wallet' : 'No wallet found'}

@@ -20,10 +20,11 @@ const OUTCOME_STAMP: Record<OutcomeKind, { tone: Tone; text: string }> = {
 /**
  * The first thing on the Requests page: pick an agent, pick what it asks for
  * with the gate's likely answer beside each ask, and send it the way an agent
- * would. Sending never pays; an agent collects and pays for a cleared request.
+ * would. Sending needs a connected wallet, so nobody spends the agent's budget
+ * anonymously; an agent still collects and pays for a cleared request.
  */
 export function StartHere() {
-  const { agents, loaded, busy, setBusy, refresh, health, gatewayState } = useConsole();
+  const { agents, loaded, busy, setBusy, refresh, health, gatewayState, canAct, wallet, connect } = useConsole();
   const [hidden, setHidden] = useState(false);
   const [agentId, setAgentId] = useState('');
   const [askKey, setAskKey] = useState<AskKey>(DEFAULT_ASK.key);
@@ -55,7 +56,7 @@ export function StartHere() {
   const sending = busy === 'submit';
 
   async function send() {
-    if (!selectedId) return;
+    if (!selectedId || !canAct) return;
     setResult(null);
     setBusy('submit');
     try {
@@ -158,15 +159,28 @@ export function StartHere() {
             {outcomeLine(outcome.kind, outcome.reason, usd(askFare(ask)), agentPays)}
           </p>
           <div>
-            <Button
-              variant="primary"
-              loading={sending}
-              disabled={!selectedId || gatewayState !== 'online'}
-              onClick={() => void send()}
-            >
-              {sending ? 'Sending' : 'Send request'}
-            </Button>
+            {canAct ? (
+              <Button
+                variant="primary"
+                loading={sending}
+                disabled={!selectedId || gatewayState !== 'online'}
+                onClick={() => void send()}
+              >
+                {sending ? 'Sending' : 'Send request'}
+              </Button>
+            ) : (
+              <Button variant="primary" disabled={!wallet.available} onClick={() => void connect()}>
+                Connect to send
+              </Button>
+            )}
           </div>
+          {canAct ? null : (
+            <p className="text-[12.5px] leading-relaxed text-muted">
+              {wallet.available
+                ? 'Requests are sent only while a wallet is connected.'
+                : 'Sending needs a browser wallet such as MetaMask.'}
+            </p>
+          )}
           {result ? (
             <p role="status" className={`text-[12.5px] leading-relaxed ${result.tone === 'bad' ? 'text-stop' : 'text-ink'}`}>
               {result.text}
